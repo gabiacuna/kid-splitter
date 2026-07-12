@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+  <!-- Three people representing groups -->
+  <!-- Person 1 (left) -->
+  <circle cx="4" cy="6" r="2.5" fill="#e3e3e3"/>
+  <path d="M 1 11 Q 1 9 4 9 Q 7 9 7 11 L 7 13 L 1 13 Z" fill="#e3e3e3"/>
+
+  <!-- Person 2 (center, slightly higher) -->
+  <circle cx="12" cy="5" r="2.5" fill="#e3e3e3"/>
+  <path d="M 9 10 Q 9 8 12 8 Q 15 8 15 10 L 15 13 L 9 13 Z" fill="#e3e3e3"/>
+
+  <!-- Person 3 (right) -->
+  <circle cx="20" cy="6" r="2.5" fill="#e3e3e3"/>
+  <path d="M 17 11 Q 17 9 20 9 Q 23 9 23 11 L 23 13 L 17 13 Z" fill="#e3e3e3"/>
+
+  <!-- Connection line at bottom -->
+  <line x1="1" y1="14" x2="23" y2="14" stroke="#e3e3e3" stroke-width="1.5"/>
+  <path d="M 1 14 Q 12 20 23 14" stroke="#e3e3e3" stroke-width="1.5" fill="none"/>
+</svg>
