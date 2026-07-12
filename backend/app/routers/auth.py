@@ -1,7 +1,7 @@
 import os
 import bcrypt
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -90,6 +90,23 @@ async def login(body: LoginRequest, response: Response, db: AsyncSession = Depen
 
     _set_auth_cookies(response, access_token, refresh_token)
     return AuthResponse(teacher=TeacherOut.model_validate(teacher))
+
+
+@router.post("/refresh")
+async def refresh(response: Response, refresh_token: str | None = Cookie(default=None)):
+    if not refresh_token:
+        raise HTTPException(status_code=401)
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(
+            f"{SUPABASE_URL}/auth/v1/token?grant_type=refresh_token",
+            json={"refresh_token": refresh_token},
+            headers={"apikey": SUPABASE_ANON_KEY, "Content-Type": "application/json"},
+        )
+    if resp.status_code != 200:
+        raise HTTPException(status_code=401)
+    data = resp.json()
+    _set_auth_cookies(response, data["access_token"], data["refresh_token"])
+    return {"detail": "Refreshed"}
 
 
 @router.post("/logout")
