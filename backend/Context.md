@@ -96,7 +96,7 @@ async def get_cohort_or_403(cohort_id: str, teacher=Depends(current_teacher), db
 ## Environment variables
 
 ```bash
-DATABASE_URL=postgresql+asyncpg://postgres:dev@localhost/classscheduler
+DATABASE_URL=postgresql+asyncpg://postgres:dev@localhost/kidsplitter
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_JWT_SECRET=your-jwt-secret
 FRONTEND_URL=http://localhost:5173

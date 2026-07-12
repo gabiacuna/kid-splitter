@@ -16,7 +16,7 @@ cp .env.example .env
 # Edit .env — set DATABASE_URL and SUPABASE_JWT_SECRET at minimum
 
 # 3. Create the database and run migrations
-createdb classscheduler
+createdb kidsplitter
 uv run alembic upgrade head
 
 # 4. Start the dev server
