@@ -2,6 +2,11 @@ from io import BytesIO
 
 from openpyxl import load_workbook
 
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # run as `uv run python tests/test_export.py`
+
 from app.services.export import build_roster_workbook, content_disposition, safe_filename_stem
 
 

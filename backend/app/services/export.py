@@ -9,6 +9,14 @@ from openpyxl.styles import Font
 XLSX_MEDIA_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 
+# Mirror of VARIANTS in frontend/src/lib/solutions.ts (teacher-facing names).
+VARIANT_NAMES = {
+    "balanced_sizes": "Balanced sizes",
+    "soft_priority": "Soft priority",
+    "diversity_mix": "Diversity mix",
+}
+
+
 def class_label(class_number: int) -> str:
     """Mirror of classLabel() in frontend/src/lib/classes.ts: 1 -> "Class A"."""
     return f"Class {chr(64 + class_number)}"

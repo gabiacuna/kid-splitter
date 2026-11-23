@@ -20,7 +20,7 @@ from ..models.teacher import Teacher
 from ..schemas.solve import SolveRequest, SolveResponse, SolutionOut, SolutionDetailOut, SolverMetadata, AssignmentOut, GenderSplit
 from ..schemas.constraint import ContradictionOut
 from ..services.solver import SolverInput, run_solver, evaluate_preferences
-from ..services.export import XLSX_MEDIA_TYPE, build_roster_workbook, content_disposition, safe_filename_stem
+from ..services.export import XLSX_MEDIA_TYPE, build_roster_workbook, content_disposition, safe_filename_stem, VARIANT_NAMES
 from ..services.validator import detect_contradictions, short_display_names
 
 logger = logging.getLogger(__name__)
@@ -285,7 +285,8 @@ async def export_solution(
     )).all()
     content = build_roster_workbook([(k, f"{first} {last}".strip()) for k, first, last in rows])
 
-    stem = safe_filename_stem(f"{cohort.name} {sol.label or ''}".strip())
+    variant = VARIANT_NAMES.get(sol.label or "", sol.label or "")
+    stem = safe_filename_stem(f"{cohort.name} - {variant}".strip(" -"))
     return Response(
         content=content,
         media_type=XLSX_MEDIA_TYPE,
