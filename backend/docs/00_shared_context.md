@@ -8,11 +8,11 @@
 
 | Layer | Choice |
 |---|---|
-| Language | Python 3.11+ |
+| Language | Python 3.14+ |
 | Framework | FastAPI (async) |
 | ORM | SQLAlchemy 2.0 async (`AsyncSession`) |
 | Migrations | Alembic |
-| Auth | Supabase Auth — JWT validation via `python-jose` |
+| Auth | Supabase Auth — ES256 JWT validation via the project's JWKS endpoint and `python-jose` |
 | DB | PostgreSQL 15 |
 | Password hashing | `bcrypt` |
 | Validation | Pydantic v2 |
@@ -111,6 +111,7 @@ id         UUID PRIMARY KEY DEFAULT gen_random_uuid()
 cohort_id  UUID NOT NULL REFERENCES cohorts(id) ON DELETE CASCADE
 student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE
 type       TEXT CHECK (type IN ('small_class','large_class','max_flagged_peers','max_conflict_peers'))
+tag        TEXT                   -- required for max_* types; tag whose peers are counted
 parameter  INTEGER                -- required for max_* types; ignored for small_class / large_class
 is_hard    BOOLEAN NOT NULL DEFAULT false
 weight     FLOAT DEFAULT 1.0
@@ -171,31 +172,50 @@ async def get_db() -> AsyncSession:
 ## `dependencies.py`
 
 ```python
-from fastapi import Depends, HTTPException, Cookie
+from fastapi import Depends, HTTPException, Cookie, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from jose import jwt, JWTError
+import httpx
 import os
 from .db import get_db
 from .models.teacher import Teacher
 from .models.cohort import Cohort
 
-SUPABASE_JWT_SECRET = os.environ["SUPABASE_JWT_SECRET"]
+SUPABASE_URL = os.environ["SUPABASE_URL"]
+SUPABASE_ANON_KEY = os.environ["SUPABASE_ANON_KEY"]
+
+_jwks_cache: dict | None = None
+
+async def _get_jwks() -> dict:
+    global _jwks_cache
+    if _jwks_cache is None:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{SUPABASE_URL}/auth/v1/.well-known/jwks.json",
+                headers={"apikey": SUPABASE_ANON_KEY},
+            )
+            response.raise_for_status()
+            _jwks_cache = response.json()
+    return _jwks_cache
 
 async def current_teacher(
+    request: Request,
     access_token: str | None = Cookie(default=None),
     db: AsyncSession = Depends(get_db),
 ) -> Teacher:
     if not access_token:
         raise HTTPException(status_code=401)
     try:
-        payload = jwt.decode(access_token, SUPABASE_JWT_SECRET, algorithms=["HS256"])
-        teacher_id: str = payload.get("sub")
-    except JWTError:
+        jwks = await _get_jwks()
+        payload = jwt.decode(access_token, jwks, algorithms=["ES256"], audience="authenticated")
+        email: str = payload.get("email")
+    except (JWTError, httpx.HTTPError):
         raise HTTPException(status_code=401)
-    teacher = await db.get(Teacher, teacher_id)
+    teacher = await db.scalar(select(Teacher).where(Teacher.email == email))
     if not teacher:
         raise HTTPException(status_code=401)
+    request.state.teacher_id = teacher.id
     return teacher
 
 async def get_cohort_or_403(
@@ -235,9 +255,10 @@ async def get_cohort_or_403(
 ```bash
 DATABASE_URL=postgresql+asyncpg://postgres:dev@localhost/kidsplitter
 SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_JWT_SECRET=your-jwt-secret
+SUPABASE_ANON_KEY=your-publishable-or-legacy-anon-key
 FRONTEND_URL=http://localhost:5173
 SHARE_BASE_URL=http://localhost:5173
+ENV=development
 ```
 
 ---

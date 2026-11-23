@@ -8,11 +8,11 @@ Kid Splitter is a class-scheduling tool for primary school teachers. Teachers de
 
 | Layer | Choice |
 |---|---|
-| Language | Python 3.11+ |
+| Language | Python 3.14+ |
 | Framework | FastAPI (async) |
 | ORM | SQLAlchemy 2.0 async (`AsyncSession`) |
 | Migrations | Alembic |
-| Auth | Supabase Auth — JWT validation via `python-jose` |
+| Auth | Supabase Auth — ES256 JWT validation via the project's JWKS endpoint and `python-jose` |
 | DB | PostgreSQL 15 |
 | Password hashing | `bcrypt` |
 | Validation | Pydantic v2 |
@@ -60,7 +60,7 @@ All tables have `created_at` and `updated_at` (`TIMESTAMPTZ`). Row-level isolati
 | `cohorts` | `id`, `teacher_id FK`, `name`, `year`, `num_classes` (min 2) |
 | `students` | `id`, `cohort_id FK`, `first_name`, `last_name`, `tags TEXT[]`, `import_source` |
 | `binary_constraints` | `id`, `cohort_id FK`, `student_a_id FK`, `student_b_id FK`, `type` (`together`/`separate`), `is_hard`, `weight` (0.1–10.0) |
-| `unary_constraints` | `id`, `cohort_id FK`, `student_id FK`, `type` (`small_class`/`large_class`/`max_flagged_peers`/`max_conflict_peers`), `parameter`, `is_hard`, `weight` |
+| `unary_constraints` | `id`, `cohort_id FK`, `student_id FK`, `type` (`small_class`/`large_class`/`max_flagged_peers`/`max_conflict_peers`), `tag`, `parameter`, `is_hard`, `weight` |
 | `solutions` | `id`, `cohort_id FK`, `label`, `score`, `hard_violations`, `soft_violations`, `share_token UUID UNIQUE`, `share_enabled`, `solver_metadata JSONB` |
 | `class_assignments` | `id`, `solution_id FK`, `student_id FK`, `class_number` (1-indexed); UNIQUE `(solution_id, student_id)` |
 
@@ -98,9 +98,10 @@ async def get_cohort_or_403(cohort_id: str, teacher=Depends(current_teacher), db
 ```bash
 DATABASE_URL=postgresql+asyncpg://postgres:dev@localhost/kidsplitter
 SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_JWT_SECRET=your-jwt-secret
+SUPABASE_ANON_KEY=your-publishable-or-legacy-anon-key
 FRONTEND_URL=http://localhost:5173
 SHARE_BASE_URL=http://localhost:5173
+ENV=development
 ```
 
 ---

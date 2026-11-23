@@ -12,6 +12,7 @@ All 6 router domains are scaffolded and all endpoints exist. The core happy path
 |---|---|---|
 | POST /auth/register | ✅ Done | bcrypt hash, Supabase signup, httpOnly cookies |
 | POST /auth/login | ✅ Done | constant-time password check, Supabase token |
+| POST /auth/refresh | ✅ Done | exchanges refresh token with Supabase and rotates both cookies |
 | POST /auth/logout | ✅ Done | clears both cookies |
 | GET /auth/me | ✅ Done | |
 
@@ -129,6 +130,10 @@ All 6 router domains are scaffolded and all endpoints exist. The core happy path
 ---
 
 ## Changelog
+
+### 2026-07-02
+1. **Supabase JWT verification migrated to JWKS** — access tokens are verified as ES256 against the project's JWKS endpoint; the legacy `SUPABASE_JWT_SECRET` is no longer used.
+2. **Auth refresh endpoint added** — `POST /auth/refresh` exchanges the refresh cookie with Supabase and rotates both auth cookies.
 
 ### 2026-06-30
 1. **`max_flagged_peers` / `max_conflict_peers` fixed** — added `tag` column to `unary_constraints` (migration `002`), updated model/schema/router/solver to store and use the actual tag name instead of `c.type`.

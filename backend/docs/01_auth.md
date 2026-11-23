@@ -8,7 +8,7 @@
 
 ## Responsibility
 
-Registration, login, logout, and profile retrieval for teachers. Passwords are hashed with `bcrypt`. JWTs are issued by Supabase Auth and stored in `httpOnly` cookies.
+Registration, login, token refresh, logout, and profile retrieval for teachers. Passwords are hashed with `bcrypt`. JWTs are issued by Supabase Auth and stored in `httpOnly` cookies.
 
 ---
 
@@ -18,6 +18,7 @@ Registration, login, logout, and profile retrieval for teachers. Passwords are h
 |---|---|---|---|
 | POST | `/auth/register` | None | Create teacher account |
 | POST | `/auth/login` | None | Email + password → set JWT cookie |
+| POST | `/auth/refresh` | Refresh cookie | Exchange the refresh token and rotate both auth cookies |
 | POST | `/auth/logout` | Required | Clear JWT cookie |
 | GET | `/auth/me` | Required | Return current teacher profile |
 
@@ -136,6 +137,21 @@ class AuthResponse(BaseModel):
 2. Delete both cookies by setting `max_age=0`.
 3. Optionally call Supabase `POST /auth/v1/logout` to invalidate server-side session.
 4. Return `200 {"detail": "Logged out"}`.
+
+### `POST /auth/refresh`
+
+1. Read the `refresh_token` httpOnly cookie. If it is absent, return `401`.
+2. Exchange it through Supabase Auth at `POST /auth/v1/token?grant_type=refresh_token`.
+3. If Supabase rejects it, return `401`.
+4. Rotate both `access_token` and `refresh_token` cookies from the response.
+5. Return `200 {"detail": "Refreshed"}`.
+
+### Access-token verification
+
+`current_teacher` fetches the project's public keys from
+`/auth/v1/.well-known/jwks.json`, caches them in process, and verifies access
+tokens with ES256 and the `authenticated` audience. It then resolves the local
+teacher by the token's email claim. `SUPABASE_JWT_SECRET` is not used.
 
 ### `GET /auth/me`
 

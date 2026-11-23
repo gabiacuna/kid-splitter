@@ -4,7 +4,7 @@ FastAPI backend for class-scheduling. Teachers define student cohorts and constr
 
 ## Quick start
 
-**Prerequisites:** Python 3.11+, PostgreSQL 15, [uv](https://github.com/astral-sh/uv)
+**Prerequisites:** Python 3.14+, PostgreSQL 15, [uv](https://github.com/astral-sh/uv)
 
 ```bash
 # 1. Install dependencies
@@ -13,7 +13,7 @@ uv sync
 
 # 2. Configure environment
 cp .env.example .env
-# Edit .env — set DATABASE_URL and SUPABASE_JWT_SECRET at minimum
+# Edit .env — set DATABASE_URL, SUPABASE_URL, and SUPABASE_ANON_KEY
 
 # 3. Create the database and run migrations
 createdb kidsplitter
@@ -31,9 +31,13 @@ API docs available at `http://localhost:8000/docs`.
 |---|---|
 | `DATABASE_URL` | `postgresql+asyncpg://user:pass@host/dbname` |
 | `SUPABASE_URL` | Your Supabase project URL |
-| `SUPABASE_JWT_SECRET` | JWT secret from Supabase project settings |
+| `SUPABASE_ANON_KEY` | Supabase publishable key (preferred) or legacy `anon` key; sent as the Auth API `apikey` |
 | `FRONTEND_URL` | Origin allowed by CORS (default `http://localhost:5173`) |
 | `SHARE_BASE_URL` | Base URL used in share links |
+| `ENV` | Set to `production` to mark auth cookies as `Secure` (default: development) |
+
+`SUPABASE_JWT_SECRET` is not required. Access tokens are verified against the
+project's JWKS endpoint and must use ES256 signing.
 
 ## Running migrations
 
