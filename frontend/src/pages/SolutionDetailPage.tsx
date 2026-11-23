@@ -6,11 +6,9 @@ import type { BinaryConstraint, ClassAssignment, Solution, Student, UnaryConstra
 import Nav from '../components/Nav';
 import ShareModal from '../components/ShareModal';
 import { useToast } from '../components/Toast';
-import { classColorStyle } from '../lib/classes';
+import { classColorStyle, classLabel } from '../lib/classes';
+import { variantName } from '../lib/solutions';
 
-function classLabel(classNum: number): string {
-  return `Class ${classNum}`;
-}
 
 function getStudentName(id: string, students: Student[]): string {
   const s = students.find((x) => x.id === id);
@@ -217,11 +215,11 @@ export default function SolutionDetailPage() {
 
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
             <div>
-              <h1 className="page-title">{solution.label}</h1>
+              <h1 className="page-title">{variantName(solution.label)}</h1>
               <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 8, flexWrap: 'wrap' }}>
                 <span>
-                  <span className="solution-score" style={{ fontSize: 22 }}>{solution.score.toFixed(1)}</span>
-                  <span style={{ fontSize: 13, color: 'var(--text3)', marginLeft: 6 }}>(lower is better)</span>
+                  <span className="solution-score" style={{ fontSize: 22 }}>{Math.round(solution.score)}</span>
+                  <span style={{ fontSize: 13, color: 'var(--text3)', marginLeft: 6 }}>/ 100 score</span>
                 </span>
                 {solution.hard_violations > 0 && (
                   <span className="badge badge-red">⚠ {solution.hard_violations} hard violation(s)</span>

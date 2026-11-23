@@ -2,135 +2,149 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../lib/api';
-import type { Solution, BinaryConstraint, ClassAssignment, ValidationResult } from '../lib/types';
+import type { Solution, GenderSplit, ValidationResult } from '../lib/types';
 import { validationKey } from '../lib/queryKeys';
-import SizeDistributionChart from '../components/SizeDistributionChart';
 import { useToast } from '../components/Toast';
-import { MIN_CLASSES, MAX_CLASSES } from '../lib/classes';
+import { MIN_CLASSES, MAX_CLASSES, classColor, classLabel } from '../lib/classes';
+import { VARIANTS, variantName, rankSolutions } from '../lib/solutions';
 
-function computeSatisfied(constraint: BinaryConstraint, assignments: ClassAssignment[]) {
-  const asgn = Object.fromEntries(assignments.map((a) => [a.student_id, a.class_number]));
-  const ca = asgn[constraint.student_a_id];
-  const cb = asgn[constraint.student_b_id];
-  if (ca === undefined || cb === undefined) return null;
-  return constraint.type === 'together' ? ca === cb : ca !== cb;
+// Score accent by rank (not threshold), so three 90+ scores still read as ranked.
+const RANK_ACCENTS = [
+  { fg: 'var(--teal)', bg: 'var(--teal-light)' },
+  { fg: 'oklch(48% 0.1 155)', bg: 'var(--sage-light)' },
+  { fg: 'var(--lavender)', bg: 'var(--lavender-light)' },
+];
+
+function classSizes(solution: Solution): number[] {
+  const n = Math.max(1, ...solution.class_assignments.map((a) => a.class_number));
+  const sizes = Array(n).fill(0);
+  for (const a of solution.class_assignments) sizes[a.class_number - 1]++;
+  return sizes;
 }
 
-function DiffIndicators({ solution, reference, binaryConstraints }: { solution: Solution; reference: Solution; binaryConstraints: BinaryConstraint[] }) {
-  const [expanded, setExpanded] = useState(false);
-
-  if (solution.id === reference.id) return null;
-
-  const diffs: { constraint: BinaryConstraint; nowSatisfied: boolean }[] = [];
-  for (const c of binaryConstraints) {
-    const refSat = computeSatisfied(c, reference.class_assignments);
-    const nowSat = computeSatisfied(c, solution.class_assignments);
-    if (refSat !== null && nowSat !== null && refSat !== nowSat) {
-      diffs.push({ constraint: c, nowSatisfied: nowSat });
-    }
-  }
-
-  if (diffs.length === 0) {
-    return <p style={{ fontSize: 12.5, color: 'var(--text3)' }}>No difference in constraint satisfaction.</p>;
-  }
-
-  const gained = diffs.filter((d) => d.nowSatisfied);
-  const lost = diffs.filter((d) => !d.nowSatisfied);
-
+function ClassSizeBars({ solution }: { solution: Solution }) {
+  const sizes = classSizes(solution);
+  const max = Math.max(...sizes, 1);
   return (
-    <div>
-      {gained.length > 0 && (
-        <span style={{ fontSize: 12.5, color: 'var(--sage)', marginRight: 8 }}>
-          ↑ {gained.length} satisfied
-        </span>
-      )}
-      {lost.length > 0 && (
-        <span style={{ fontSize: 12.5, color: 'var(--coral)' }}>
-          ↓ {lost.length} violated
-        </span>
-      )}
-      <button
-        style={{ background: 'none', border: 'none', color: 'var(--teal)', fontSize: 12, cursor: 'pointer', marginLeft: 8 }}
-        onClick={() => setExpanded((p) => !p)}
-      >
-        {expanded ? 'hide' : 'details'}
-      </button>
-      {expanded && (
-        <ul style={{ marginTop: 6, marginLeft: 14, fontSize: 12.5, color: 'var(--text2)', display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {diffs.map((d, i) => (
-            <li key={i} style={{ color: d.nowSatisfied ? 'var(--sage)' : 'var(--coral)' }}>
-              {d.nowSatisfied ? '✓' : '✗'} {d.constraint.type}
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
+    <section className="bar-section" aria-label="Class sizes">
+      <h4 className="caps-label">Class sizes</h4>
+      {sizes.map((size, i) => (
+        <div key={i} className="hbar-row">
+          <span className="hbar-label">{classLabel(i + 1)}</span>
+          <div className="hbar-track">
+            <div className="hbar-fill" style={{ width: `${(size / max) * 100}%`, background: classColor(i + 1) }} />
+          </div>
+          <span className="hbar-value">{size}</span>
+        </div>
+      ))}
+    </section>
   );
 }
 
-function SolutionCard({
-  solution,
-  allSolutions,
-  binaryConstraints,
-  onDelete,
-}: {
-  solution: Solution;
-  allSolutions: Solution[];
-  binaryConstraints: BinaryConstraint[];
-  onDelete: () => void;
-}) {
-  const isBest = solution.score === Math.min(...allSolutions.map((s) => s.score));
-  const hasViolations = solution.hard_violations > 0;
-  const reference = allSolutions.find((s) => s.label === 'Soft priority') ?? allSolutions[0];
-
+function GenderBars({ split }: { split: GenderSplit[] }) {
   return (
-    <div className={`solution-card${isBest ? ' best' : ''}${hasViolations ? ' has-violations' : ''}`}>
-      {isBest && <div className="solution-best-badge">✦ BEST</div>}
-      <div style={{ fontSize: 17, fontWeight: 700, letterSpacing: '-0.2px', marginBottom: 10 }}>{solution.label}</div>
+    <section className="bar-section" aria-label="Boy / girl balance">
+      <h4 className="caps-label">Boy / girl balance</h4>
+      {split.map((c) => {
+        const total = c.boys + c.girls + c.unknown || 1;
+        return (
+          <div key={c.class_number} className="hbar-row">
+            <span className="hbar-label">{classLabel(c.class_number)}</span>
+            <div className="hbar-track segmented" role="img"
+              aria-label={`${c.boys} boys, ${c.girls} girls${c.unknown ? `, ${c.unknown} unknown` : ''}`}>
+              {c.boys > 0 && <div className="seg boys" style={{ width: `${(c.boys / total) * 100}%` }} />}
+              {c.girls > 0 && <div className="seg girls" style={{ width: `${(c.girls / total) * 100}%` }} />}
+              {c.unknown > 0 && <div className="seg unknown" style={{ width: `${(c.unknown / total) * 100}%` }} />}
+            </div>
+            <span className="hbar-value small">
+              {c.boys}B / {c.girls}G{c.unknown ? ` / ${c.unknown}?` : ''}
+            </span>
+          </div>
+        );
+      })}
+    </section>
+  );
+}
 
-      {hasViolations && (
-        <div className="badge badge-red" style={{ marginBottom: 10 }}>
-          ⚠ {solution.hard_violations} hard violation(s) — this solution has a problem
+function SolutionCard({ solution, rank, showGender, onDelete }: {
+  solution: Solution; rank: number; showGender: boolean; onDelete: () => void;
+}) {
+  const best = rank === 0;
+  const accent = RANK_ACCENTS[Math.min(rank, RANK_ACCENTS.length - 1)];
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  return (
+    <article className={`solution-card${best ? ' best' : ''}${solution.hard_violations > 0 ? ' has-violations' : ''}`}>
+      {best && <div className="solution-best-badge">✦ BEST</div>}
+      <div>
+        <h3 className="solution-name">{variantName(solution.label)}</h3>
+        {VARIANTS[solution.label] && <p className="solution-subtitle">{VARIANTS[solution.label].subtitle}</p>}
+      </div>
+      <div className="solution-score-row">
+        <span className="solution-score" style={{ color: accent.fg }}>{Math.round(solution.score)}</span>
+        <span className="solution-score-unit">/ 100 score</span>
+      </div>
+      <div className="stat-chips">
+        <div className="stat-chip" style={{ background: accent.bg, color: accent.fg }}>
+          <span>Soft violations</span><strong>{solution.soft_violations}</strong>
         </div>
+        <div className={`stat-chip${solution.hard_violations ? ' danger' : ' neutral'}`}>
+          <span>Hard violations</span><strong>{solution.hard_violations}</strong>
+        </div>
+      </div>
+      {solution.solver_metadata?.status === 'FEASIBLE' && (
+        <span className="badge badge-warn" title="The solver hit its time limit; a slightly better split may exist.">Not proven optimal</span>
       )}
-
-      <div style={{ marginBottom: 12 }}>
-        <span className="solution-score">{solution.score.toFixed(1)}</span>
-        <span style={{ fontSize: 12.5, color: 'var(--text3)', marginLeft: 6 }}>
-          {isBest && allSolutions[0].id === solution.id ? '(lower is better)' : ''}
-        </span>
-      </div>
-
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
-        <span className="badge badge-teal">{solution.soft_violations} soft unmet</span>
-        {solution.solver_metadata?.status === 'FEASIBLE' && (
-          <span className="badge badge-warn">Not optimal</span>
-        )}
-      </div>
-
-      <div style={{ marginBottom: 14 }}>
-        <div style={{ fontSize: 11.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text3)', marginBottom: 8 }}>
-          Class sizes
-        </div>
-        <SizeDistributionChart
-          assignments={solution.class_assignments}
-          numClasses={Math.max(...solution.class_assignments.map((a) => a.class_number), 1)}
-        />
-      </div>
-
-      <div style={{ marginBottom: 16, minHeight: 24 }}>
-        <DiffIndicators solution={solution} reference={reference} binaryConstraints={binaryConstraints} />
-      </div>
-
-      <div style={{ display: 'flex', gap: 8 }}>
-        <Link to={`/solutions/${solution.id}`} className="btn btn-primary" style={{ flex: 1, textAlign: 'center' }}>
+      <ClassSizeBars solution={solution} />
+      {showGender && <GenderBars split={solution.gender_split} />}
+      <div className="solution-actions">
+        <Link to={`/solutions/${solution.id}`} className={`btn ${best ? 'btn-primary' : 'btn-secondary'}`}>
           View class lists
         </Link>
-        <button className="btn btn-ghost" style={{ padding: '6px 12px', color: 'var(--coral)', fontSize: 12 }} onClick={onDelete}>
-          Delete
-        </button>
+        {confirmDelete ? (
+          <span className="solution-delete-confirm">
+            Delete this option?{' '}
+            <button type="button" className="link-button danger" onClick={onDelete}>Delete</button>{' '}
+            <button type="button" className="link-button" onClick={() => setConfirmDelete(false)}>Cancel</button>
+          </span>
+        ) : (
+          <button type="button" className="link-button muted" onClick={() => setConfirmDelete(true)}>Delete</button>
+        )}
       </div>
-    </div>
+    </article>
+  );
+}
+
+function SolutionRun({ solutions, onDelete }: { solutions: Solution[]; onDelete: (id: string) => void }) {
+  const ranked = rankSolutions(solutions);
+  const first = ranked[0];
+  const totals = first.gender_split.reduce(
+    (t, c) => ({ boys: t.boys + c.boys, girls: t.girls + c.girls, unknown: t.unknown + c.unknown }),
+    { boys: 0, girls: 0, unknown: 0 },
+  );
+  const students = totals.boys + totals.girls + totals.unknown;
+  // No gender data at all -> hide the section, legend and disclosure entirely.
+  const showGender = totals.boys + totals.girls > 0;
+  return (
+    <>
+      <div className="solution-cards">
+        {ranked.map((s, i) => (
+          <SolutionCard key={s.id} solution={s} rank={i} showGender={showGender} onDelete={() => onDelete(s.id)} />
+        ))}
+      </div>
+      {showGender && (
+        <div className="gender-legend" aria-hidden>
+          <span><i className="swatch boys" />Boys</span>
+          <span><i className="swatch girls" />Girls</span>
+          {totals.unknown > 0 && <span><i className="swatch unknown" />Not set</span>}
+        </div>
+      )}
+      {showGender && totals.unknown > 0 && (
+        <p className="gender-disclosure">
+          {totals.unknown} of {students} students have no gender set, so the balance bars only cover the rest.{' '}
+          <Link to="?tab=students">Set it in the Students tab</Link>
+        </p>
+      )}
+    </>
   );
 }
 
@@ -246,11 +260,6 @@ export default function SolutionsTab({ cohortId, numStudents }: { cohortId: stri
     queryFn: () => api.get(`/cohorts/${cohortId}/solutions`).then((r) => r.data),
   });
 
-  const { data: constraintData } = useQuery<{ binary: BinaryConstraint[] }>({
-    queryKey: ['constraints', cohortId],
-    queryFn: () => api.get(`/cohorts/${cohortId}/constraints`).then((r) => r.data),
-  });
-
   // Shared with the constraint editor, which invalidates it after edits settle.
   const { data: validation } = useQuery<ValidationResult>({
     queryKey: validationKey(cohortId),
@@ -259,7 +268,6 @@ export default function SolutionsTab({ cohortId, numStudents }: { cohortId: stri
 
   // Previously read an object as an array, so this was always false and solve was never gated.
   const hasContradictions = validation?.has_contradictions ?? false;
-  const binaryConstraints = constraintData?.binary ?? [];
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/solutions/${id}`),
@@ -269,17 +277,17 @@ export default function SolutionsTab({ cohortId, numStudents }: { cohortId: stri
 
   if (isLoading) return <div><div className="spinner" /></div>;
 
-  // Group by solve run (cluster by created_at within ~5s)
-  const grouped: Solution[][] = [];
+  // Group by solve run (solutions of one run are created within seconds), newest first.
+  const runs: Solution[][] = [];
   const sorted = [...(solutions ?? [])].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   for (const s of sorted) {
-    const last = grouped[grouped.length - 1];
-    if (last && Math.abs(new Date(s.created_at).getTime() - new Date(last[0].created_at).getTime()) < 10000) {
-      last.push(s);
-    } else {
-      grouped.push([s]);
-    }
+    const last = runs[runs.length - 1];
+    if (last && Math.abs(new Date(s.created_at).getTime() - new Date(last[0].created_at).getTime()) < 10000) last.push(s);
+    else runs.push([s]);
   }
+  const [latest, ...earlier] = runs;
+  const remove = (id: string) => deleteMutation.mutate(id);
+  const when = (run: Solution[]) => new Date(run[0].created_at).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
   return (
     <div>
@@ -287,41 +295,38 @@ export default function SolutionsTab({ cohortId, numStudents }: { cohortId: stri
         cohortId={cohortId}
         hasContradictions={hasContradictions}
         totalStudents={numStudents}
-        onSolved={() => qc.invalidateQueries({ queryKey: ['solutions', cohortId] })}
+        onSolved={() => { qc.invalidateQueries({ queryKey: ['solutions', cohortId] }); qc.invalidateQueries({ queryKey: ['cohorts'] }); }}
       />
 
-      {grouped.length === 0 && (
+      {!latest && (
         <div className="empty-state">
           <h3>No class lists yet</h3>
           <p>Use the form above to generate class arrangement options.</p>
         </div>
       )}
 
-      {grouped.map((group, gi) => {
-        const isFeasible = group.some((s) => s.solver_metadata?.status === 'FEASIBLE');
-        const date = new Date(group[0].created_at).toLocaleString(undefined, { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-        return (
-          <div key={gi} style={{ marginBottom: 32 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text2)' }}>Generated on {date}</span>
-              {isFeasible && (
-                <span className="badge badge-warn">Solver reached time limit — results may not be optimal</span>
-              )}
+      {latest && (
+        <>
+          <p className="solutions-intro">
+            Here are {latest.length} ways to split your students. Pick the one that feels right for your class.
+            <span className="solutions-when"> Generated {when(latest)}.</span>
+          </p>
+          <SolutionRun solutions={latest} onDelete={remove} />
+          <p className="solutions-caption">On a small screen? Cards stack so you can compare one at a time.</p>
+        </>
+      )}
+
+      {earlier.length > 0 && (
+        <details className="earlier-runs">
+          <summary>Earlier runs ({earlier.length})</summary>
+          {earlier.map((run) => (
+            <div key={run[0].id} className="earlier-run">
+              <h4>Generated {when(run)}</h4>
+              <SolutionRun solutions={run} onDelete={remove} />
             </div>
-            <div className="solution-cards">
-              {group.map((s) => (
-                <SolutionCard
-                  key={s.id}
-                  solution={s}
-                  allSolutions={group}
-                  binaryConstraints={binaryConstraints}
-                  onDelete={() => deleteMutation.mutate(s.id)}
-                />
-              ))}
-            </div>
-          </div>
-        );
-      })}
+          ))}
+        </details>
+      )}
     </div>
   );
 }

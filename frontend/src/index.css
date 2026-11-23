@@ -602,46 +602,6 @@ tr:last-child td { border-bottom: none; }
 tr:hover td { background: var(--bg); }
 
 
-/* Solution card */
-.solution-cards {
-  display: flex;
-  gap: 16px;
-  align-items: flex-start;
-}
-.solution-card {
-  flex: 1;
-  background: var(--card);
-  border-radius: var(--r);
-  box-shadow: var(--shadow);
-  padding: 22px;
-  border: 1.5px solid var(--border);
-  position: relative;
-}
-.solution-card.best {
-  border-color: var(--teal);
-  box-shadow: var(--shadow-md);
-}
-.solution-card.has-violations {
-  border-color: #ef4444;
-}
-.solution-best-badge {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  background: var(--teal);
-  color: #fff;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.5px;
-  padding: 3px 8px;
-  border-radius: 20px;
-}
-.solution-score {
-  font-size: 28px;
-  font-weight: 800;
-  color: var(--teal);
-  line-height: 1;
-}
 
 /* Bar chart */
 .bar-chart {
@@ -991,3 +951,68 @@ input[type='range'] {
 .cohort-empty-note strong { color: var(--text2); font-size: 13px; }
 .cohort-open { width: 100%; text-align: center; margin-top: auto; }
 @media (max-width: 640px) { .cohort-grid { grid-template-columns: 1fr; } }
+
+/* ---------- Solutions comparison (feature 07) ---------- */
+:root {
+  --boys: var(--class-1);   /* teal  #00918b — validated pair with amber */
+  --girls: var(--class-2);  /* amber #e49e22 */
+}
+.solutions-intro { font-size: 14px; color: var(--text3); margin: 8px 0 18px; }
+.solutions-when { font-size: 12.5px; }
+.solution-cards { display: flex; gap: 18px; align-items: stretch; }
+.solution-card {
+  flex: 1; min-width: 0; position: relative;
+  background: var(--card); border-radius: 14px; padding: 28px;
+  border: 1.5px solid var(--border); box-shadow: 0 2px 16px oklch(20% 0.02 85 / 0.08);
+  display: flex; flex-direction: column; gap: 18px;
+}
+.solution-card.best { border: 2px solid var(--teal); box-shadow: 0 4px 24px oklch(20% 0.02 85 / 0.11); }
+.solution-card.has-violations { border-color: var(--coral); }
+.solution-best-badge {
+  position: absolute; top: -1px; right: 18px;
+  background: var(--teal); color: #fff; font-size: 11px; font-weight: 800; letter-spacing: 0.5px;
+  padding: 5px 10px; border-radius: 0 0 8px 8px;
+}
+.solution-name { font-size: 18px; font-weight: 800; letter-spacing: -0.2px; margin: 0; }
+.solution-subtitle { font-size: 12.5px; color: var(--text2); margin: 3px 0 0; }
+.solution-score-row { display: flex; align-items: baseline; gap: 6px; margin-top: -8px; }
+.solution-score { font-size: 28px; font-weight: 800; line-height: 1; color: var(--teal); }
+.solution-score-unit { font-size: 13px; color: var(--text3); }
+.stat-chips { display: flex; gap: 10px; }
+.stat-chip { flex: 1; border-radius: 8px; padding: 10px; text-align: center; display: flex; flex-direction: column; gap: 2px; font-size: 12.5px; font-weight: 600; }
+.stat-chip strong { font-size: 20px; font-weight: 800; }
+.stat-chip.neutral { background: var(--bg2); color: var(--text2); }
+.stat-chip.danger { background: var(--coral-light); color: var(--coral); }
+.caps-label { font-size: 11.5px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text3); margin: 0 0 8px; }
+.bar-section { display: flex; flex-direction: column; gap: 7px; }
+.bar-section .caps-label { margin-bottom: 2px; }
+.hbar-row { display: grid; grid-template-columns: 56px 1fr auto; align-items: center; gap: 10px; }
+.hbar-label { font-size: 12px; font-weight: 600; color: var(--text2); white-space: nowrap; }
+.hbar-track { height: 10px; border-radius: 4px; background: var(--bg2); overflow: hidden; display: flex; }
+.hbar-fill { height: 100%; border-radius: 4px; }
+.hbar-track.segmented { gap: 2px; background: none; }
+.seg { height: 100%; }
+.seg:first-child { border-radius: 4px 0 0 4px; }
+.seg:last-child { border-radius: 0 4px 4px 0; }
+.seg:only-child { border-radius: 4px; }
+.seg.boys, .swatch.boys { background: var(--boys); }
+.seg.girls, .swatch.girls { background: var(--girls); }
+.seg.unknown, .swatch.unknown { background: var(--bg2); box-shadow: inset 0 0 0 1px var(--border); }
+.hbar-value { font-size: 12px; color: var(--text2); min-width: 18px; text-align: right; font-variant-numeric: tabular-nums; }
+.hbar-value.small { font-size: 11px; }
+.solution-actions { margin-top: auto; display: flex; flex-direction: column; gap: 8px; align-items: center; }
+.solution-actions .btn { width: 100%; text-align: center; }
+.link-button.muted { color: var(--text3); font-size: 12px; text-decoration: none; }
+.link-button.muted:hover { color: var(--coral); }
+.link-button.danger { color: var(--coral); }
+.solution-delete-confirm { font-size: 12px; color: var(--text2); }
+.gender-legend { display: flex; justify-content: center; gap: 18px; margin-top: 14px; font-size: 12.5px; color: var(--text2); }
+.gender-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.swatch { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.gender-disclosure { text-align: center; font-size: 12.5px; color: var(--text3); margin: 8px 0 0; }
+.gender-disclosure a { color: var(--teal); font-weight: 600; }
+.solutions-caption { text-align: center; font-size: 12px; color: var(--text3); margin-top: 14px; }
+.earlier-runs { margin-top: 36px; }
+.earlier-runs summary { cursor: pointer; font-weight: 700; color: var(--text2); font-size: 14px; }
+.earlier-run h4 { font-size: 13px; color: var(--text2); margin: 18px 0 10px; }
+@media (max-width: 640px) { .solution-cards { flex-direction: column; } }

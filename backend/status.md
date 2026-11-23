@@ -131,6 +131,10 @@ All 6 router domains are scaffolded and all endpoints exist. The core happy path
 
 ## Changelog
 
+### 2026-11-23 — solutions (design feature 07)
+1. **Solution responses include `class_assignments`** (list and detail). The list had none and the detail called it `assignments`, so the Solutions tab and the solution page crashed for every solved cohort.
+2. **`score` is now 0–100: share of soft-preference weight honoured**, computed on read against current rules (`evaluate_preferences` in `solver.py`), along with `soft_violations`. The old score was each variant's own objective, not comparable across variants (balanced_sizes always "won").
+
 ### 2026-11-23 — dashboard (design feature 06)
 1. **`CohortOut.last_solve_at`** = `MAX(solutions.created_at)`, folded into the list query (student count uses `COUNT(DISTINCT)` so the extra join can't inflate it). Fixes every cohort showing "No solves yet".
 

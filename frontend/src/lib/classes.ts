@@ -14,3 +14,8 @@ export function classColor(classNumber: number): string {
 export function classColorStyle(classNumber: number): CSSProperties {
   return { '--class-color': classColor(classNumber) } as CSSProperties;
 }
+
+/** "Class A", "Class B", … — the design's naming; used everywhere a class is shown. */
+export function classLabel(classNumber: number): string {
+  return `Class ${String.fromCharCode(64 + classNumber)}`;
+}

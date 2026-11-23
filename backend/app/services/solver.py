@@ -241,7 +241,24 @@ def _add_gender_balance(model, x, inp: SolverInput) -> tuple[list, int]:
     return deviations, bound
 
 
-def _count_soft_violations(assignments: list[dict], inp: SolverInput) -> int:
+@dataclass
+class PreferenceEvaluation:
+    violations:      int     # soft rules not honoured
+    violated_weight: float
+    total_weight:    float
+
+    @property
+    def score(self) -> float:
+        """0–100: share of soft-preference weight honoured. Comparable across variants
+        (unlike the raw objective, whose terms differ per variant). 100 if no preferences."""
+        if self.total_weight <= 0:
+            return 100.0
+        return round(100.0 * (1 - self.violated_weight / self.total_weight), 1)
+
+
+def evaluate_preferences(assignments: list[dict], inp: SolverInput) -> PreferenceEvaluation:
+    """Check every soft rule against a finished assignment. Hard rules are excluded
+    (the solver guarantees them); gender balance is a tiebreaker, not a preference."""
     assign = {a["student_id"]: a["class_number"] for a in assignments}
     class_members: dict[int, list[str]] = {}
     for sid, cls in assign.items():
@@ -250,7 +267,14 @@ def _count_soft_violations(assignments: list[dict], inp: SolverInput) -> int:
     total = len(inp.student_ids)
     min_size = total // inp.num_classes
     max_size = ceil(total / inp.num_classes)
-    violations = 0
+    violations, violated_w, total_w = 0, 0.0, 0.0
+
+    def tally(broken: bool, weight: float) -> None:
+        nonlocal violations, violated_w, total_w
+        total_w += weight
+        if broken:
+            violations += 1
+            violated_w += weight
 
     for c in inp.binary_constraints:
         if c.is_hard:
@@ -260,10 +284,7 @@ def _count_soft_violations(assignments: list[dict], inp: SolverInput) -> int:
         if a_cls is None or b_cls is None:
             continue
         same = a_cls == b_cls
-        if c.type == "together" and not same:
-            violations += 1
-        elif c.type == "separate" and same:
-            violations += 1
+        tally((c.type == "together") != same, c.weight or 1.0)
 
     for c in inp.unary_constraints:
         if c.is_hard:
@@ -273,20 +294,19 @@ def _count_soft_violations(assignments: list[dict], inp: SolverInput) -> int:
             continue
         members = class_members.get(k, [])
         size = len(members)
-        if c.type == "small_class" and size > min_size:
-            violations += 1
-        elif c.type == "large_class" and size < max_size:
-            violations += 1
+        if c.type == "small_class":
+            tally(size > min_size, c.weight or 1.0)
+        elif c.type == "large_class":
+            tally(size < max_size, c.weight or 1.0)
         elif c.type in ("max_flagged_peers", "max_conflict_peers"):
-            tag = c.tag
-            count = sum(
-                1 for st in members
-                if st != c.student_id and tag in inp.tags_map.get(st, [])
-            )
-            if count > (c.parameter or 0):
-                violations += 1
+            count = sum(1 for st in members if st != c.student_id and c.tag in inp.tags_map.get(st, []))
+            tally(count > (c.parameter or 0), c.weight or 1.0)
 
-    return violations
+    return PreferenceEvaluation(violations, violated_w, total_w)
+
+
+def _count_soft_violations(assignments: list[dict], inp: SolverInput) -> int:
+    return evaluate_preferences(assignments, inp).violations
 
 
 def _run_variant(label: str, inp: SolverInput, include_soft: bool, include_diversity: bool) -> SolverResult:

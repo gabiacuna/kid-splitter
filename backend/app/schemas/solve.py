@@ -36,19 +36,20 @@ class SolutionOut(BaseModel):
     id:              str
     cohort_id:       str
     label:           str
-    score:           float
+    score:           float   # 0–100, share of preference weight honoured (computed on read)
     hard_violations: int
     soft_violations: int
     share_enabled:   bool
     solver_metadata: SolverMetadata
     gender_split:    list[GenderSplit]
+    class_assignments: list[AssignmentOut]
     created_at:      datetime
 
     model_config = {"from_attributes": True}
 
 
 class SolutionDetailOut(SolutionOut):
-    assignments: list[AssignmentOut]
+    """Kept as a name for the detail endpoint; every SolutionOut now carries assignments."""
 
 
 class SolveResponse(BaseModel):

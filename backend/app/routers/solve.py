@@ -1,4 +1,5 @@
 import asyncio
+from dataclasses import dataclass
 import logging
 from concurrent.futures import ThreadPoolExecutor
 from math import ceil
@@ -18,7 +19,7 @@ from ..models.solution import Solution, ClassAssignment
 from ..models.teacher import Teacher
 from ..schemas.solve import SolveRequest, SolveResponse, SolutionOut, SolutionDetailOut, SolverMetadata, AssignmentOut, GenderSplit
 from ..schemas.constraint import ContradictionOut
-from ..services.solver import SolverInput, run_solver
+from ..services.solver import SolverInput, run_solver, evaluate_preferences
 from ..services.validator import detect_contradictions, short_display_names
 
 logger = logging.getLogger(__name__)
@@ -26,7 +27,6 @@ router = APIRouter(tags=["solve"])
 limiter = Limiter(key_func=lambda request: request.state.teacher_id if hasattr(request.state, "teacher_id") else get_remote_address(request))
 _executor = ThreadPoolExecutor(max_workers=4)
 
-WEIGHT_SCALE = 100
 
 
 def _gender_split(
@@ -45,11 +45,6 @@ def _gender_split(
     ]
 
 
-async def _gender_map(db: AsyncSession, cohort_id: str) -> dict[str, str | None]:
-    rows = await db.execute(select(Student.id, Student.gender).where(Student.cohort_id == cohort_id))
-    return dict(rows.all())
-
-
 async def _assignments_by_solution(db: AsyncSession, solution_ids: list[str]) -> dict[str, list[tuple[str, int]]]:
     out: dict[str, list[tuple[str, int]]] = {sid: [] for sid in solution_ids}
     if not solution_ids:
@@ -63,22 +58,55 @@ async def _assignments_by_solution(db: AsyncSession, solution_ids: list[str]) ->
     return out
 
 
-def _solution_out(sol: Solution, gender_split: list[GenderSplit]) -> SolutionOut:
+@dataclass
+class _CohortContext:
+    """Everything needed to describe any solution of a cohort, loaded once per request."""
+    student_ids: list[str]
+    tags_map:    dict[str, list[str]]
+    gender_map:  dict[str, str | None]
+    binary:      list
+    unary:       list
+
+
+async def _cohort_context(db: AsyncSession, cohort_id: str) -> _CohortContext:
+    students = (await db.execute(
+        select(Student.id, Student.tags, Student.gender).where(Student.cohort_id == cohort_id)
+    )).all()
+    binary = (await db.execute(select(BinaryConstraint).where(BinaryConstraint.cohort_id == cohort_id))).scalars().all()
+    unary = (await db.execute(select(UnaryConstraint).where(UnaryConstraint.cohort_id == cohort_id))).scalars().all()
+    return _CohortContext(
+        student_ids=[s.id for s in students],
+        tags_map={s.id: (s.tags or []) for s in students},
+        gender_map={s.id: s.gender for s in students},
+        binary=list(binary),
+        unary=list(unary),
+    )
+
+
+def _solution_out(sol: Solution, assignments: list[tuple[str, int]], ctx: _CohortContext) -> SolutionOut:
+    """Score, soft violations and gender split are computed on read against the cohort's
+    current students and rules, so they never go stale after edits."""
     meta = sol.solver_metadata or {}
+    num_classes = max((k for _, k in assignments), default=1)
+    evaluation = evaluate_preferences(
+        [{"student_id": s, "class_number": k} for s, k in assignments],
+        SolverInput(ctx.student_ids, ctx.tags_map, ctx.binary, ctx.unary, num_classes),
+    )
     return SolutionOut(
         id=sol.id,
         cohort_id=sol.cohort_id,
         label=sol.label or "",
-        score=sol.score or 0.0,
+        score=evaluation.score,
         hard_violations=sol.hard_violations or 0,
-        soft_violations=sol.soft_violations or 0,
+        soft_violations=evaluation.violations,
         share_enabled=sol.share_enabled,
         solver_metadata=SolverMetadata(
             wall_time_s=meta.get("wall_time_s", 0.0),
             objective_value=meta.get("objective_value"),
             status=meta.get("status", "UNKNOWN"),
         ),
-        gender_split=gender_split,
+        gender_split=_gender_split(assignments, ctx.gender_map),
+        class_assignments=[AssignmentOut(student_id=s, class_number=k) for s, k in sorted(assignments, key=lambda a: (a[1], a[0]))],
         created_at=sol.created_at,
     )
 
@@ -156,7 +184,7 @@ async def solve(
             logger.error("Solver returned hard violations for variant %s — skipping persist", result.label)
             continue
 
-        score = (result.objective_value or 0) / WEIGHT_SCALE
+        score = evaluate_preferences(result.assignments, inp).score
         sol = Solution(
             cohort_id=cohort.id,
             label=result.label,
@@ -180,16 +208,14 @@ async def solve(
                 class_number=assignment["class_number"],
             ))
 
-        split = _gender_split(
-            [(a["student_id"], a["class_number"]) for a in result.assignments], gender_map
-        )
-        persisted.append((sol, split))
+        persisted.append((sol, [(a["student_id"], a["class_number"]) for a in result.assignments]))
 
     await db.commit()
     for sol, _ in persisted:
         await db.refresh(sol)
 
-    return SolveResponse(solutions=[_solution_out(s, split) for s, split in persisted])
+    ctx = await _cohort_context(db, cohort.id)
+    return SolveResponse(solutions=[_solution_out(s, asg, ctx) for s, asg in persisted])
 
 
 @router.get("/cohorts/{cohort_id}/solutions", response_model=list[SolutionOut])
@@ -202,10 +228,10 @@ async def list_solutions(
         .where(Solution.cohort_id == cohort.id)
         .order_by(Solution.created_at.desc())
     )).scalars().all()
-    # Two queries total regardless of solution count (no per-solution N+1).
-    gender_map = await _gender_map(db, cohort.id)
+    # Fixed number of queries regardless of solution count (no per-solution N+1).
+    ctx = await _cohort_context(db, cohort.id)
     by_solution = await _assignments_by_solution(db, [s.id for s in solutions])
-    return [_solution_out(s, _gender_split(by_solution[s.id], gender_map)) for s in solutions]
+    return [_solution_out(s, by_solution[s.id], ctx) for s in solutions]
 
 
 @router.get("/solutions/{solution_id}", response_model=SolutionDetailOut)
@@ -228,13 +254,9 @@ async def get_solution(
         select(ClassAssignment).where(ClassAssignment.solution_id == sol.id)
     )).scalars().all()
 
-    gender_map = await _gender_map(db, cohort.id)
-    split = _gender_split([(a.student_id, a.class_number) for a in assignments], gender_map)
-    out = _solution_out(sol, split)
-    return SolutionDetailOut(
-        **out.model_dump(),
-        assignments=[AssignmentOut(student_id=a.student_id, class_number=a.class_number) for a in assignments],
-    )
+    ctx = await _cohort_context(db, cohort.id)
+    out = _solution_out(sol, [(a.student_id, a.class_number) for a in assignments], ctx)
+    return SolutionDetailOut(**out.model_dump())
 
 
 @router.delete("/solutions/{solution_id}", status_code=204)

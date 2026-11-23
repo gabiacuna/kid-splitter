@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import api from '../lib/api'
 import type { PublicSolutionData } from '../lib/types'
-import { classColorStyle } from '../lib/classes';
+import { classColorStyle, classLabel } from '../lib/classes';
 
 export default function PublicSharePage() {
   const { token } = useParams<{ token: string }>()
@@ -60,7 +60,7 @@ export default function PublicSharePage() {
         {data.classes.map((cls) => (
           <div key={cls.class_number} className="roster-class-card" style={classColorStyle(cls.class_number)}>
             <div className="roster-class-header">
-              <span>Class {cls.class_number}</span>
+              <span>{classLabel(cls.class_number)}</span>
               <span style={{ fontWeight: 500, opacity: 0.75 }}>{cls.students.length} students</span>
             </div>
             {[...cls.students].sort((a, b) => a.first_name.localeCompare(b.first_name)).map((s, i) => (
