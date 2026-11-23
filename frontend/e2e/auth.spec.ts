@@ -1,5 +1,5 @@
 import { test, expect } from './support/fixtures';
-import { APP_URL, credentials } from './support/env';
+import { API_URL, APP_URL, credentials } from './support/env';
 
 // Fresh, logged-out visitor with English pinned (selectors are English).
 test.use({ allowHttpErrors: true, storageState: { cookies: [], origins: [{ origin: APP_URL, localStorage: [{ name: 'lang', value: 'en' }] }] } });
@@ -18,7 +18,7 @@ test('login: success shows the nav without a reload; wrong password is a clear e
   await page.waitForURL('**/cohorts');
   // Login used to store the whole { teacher } response as the teacher, so the nav had
   // no school name until a reload re-fetched /auth/me.
-  const school = (await (await page.request.get('http://localhost:8000/auth/me')).json()).school_name;
+  const school = (await (await page.request.get(`${API_URL}/auth/me`)).json()).school_name;
   await expect(page.locator('.nav-school')).toHaveText(school);
 });
 

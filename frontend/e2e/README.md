@@ -8,7 +8,7 @@ comparison, the class roster modal, `.xlsx` export and public share links.
 
 1. **The stack is running** — Postgres, the backend on `http://localhost:8000`
    (`uv run uvicorn app.main:app --reload --port 8000` in `backend/`) and the frontend on
-   `http://localhost:5173` (`npm run dev`). Override with `E2E_API_URL` / `E2E_APP_URL`.
+   `http://localhost:5173` (`npm run dev`). Override with `E2E_API_URL` (default `http://localhost:8000/api`) / `E2E_APP_URL`.
 2. **A teacher account** that can log in. Provide its credentials either as env vars
    `E2E_EMAIL` / `E2E_PASSWORD`, or in `frontend/e2e/.env` (gitignored):
 

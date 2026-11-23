@@ -1,0 +1,12 @@
+.git
+**/node_modules
+backend/.venv
+frontend/dist
+frontend/e2e/.auth
+frontend/e2e/.report
+frontend/e2e/.results
+**/__pycache__
+*.env
+**/.env
+**/*.env
+Kid's Class Scheduler UI*
