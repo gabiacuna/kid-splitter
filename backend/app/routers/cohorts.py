@@ -25,6 +25,7 @@ def _build_out(cohort: Cohort, count: int) -> CohortOut:
         name=cohort.name,
         year=cohort.year,
         num_classes=cohort.num_classes,
+        balance_gender=cohort.balance_gender,
         student_count=count,
         created_at=cohort.created_at,
         updated_at=cohort.updated_at,
@@ -59,6 +60,7 @@ async def create_cohort(
         name=body.name,
         year=body.year,
         num_classes=body.num_classes,
+        balance_gender=body.balance_gender,
     )
     db.add(cohort)
     await db.commit()
@@ -97,6 +99,8 @@ async def update_cohort(
         cohort.year = body.year
     if body.num_classes is not None:
         cohort.num_classes = body.num_classes
+    if body.balance_gender is not None:
+        cohort.balance_gender = body.balance_gender
 
     await db.commit()
     await db.refresh(cohort)

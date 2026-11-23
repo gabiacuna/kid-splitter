@@ -21,6 +21,7 @@ function CreateModal({ onClose, onCreate }: { onClose: () => void; onCreate: (c:
   const [name, setName] = useState('');
   const [year, setYear] = useState('');
   const [numClasses, setNumClasses] = useState('3');
+  const [balanceGender, setBalanceGender] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [serverError, setServerError] = useState('');
   const qc = useQueryClient();
@@ -47,7 +48,7 @@ function CreateModal({ onClose, onCreate }: { onClose: () => void; onCreate: (c:
     const errs = validate();
     if (Object.keys(errs).length) { setErrors(errs); return; }
     setServerError('');
-    mutation.mutate({ name: name.trim(), year: year ? parseInt(year) : undefined, num_classes: parseInt(numClasses) });
+    mutation.mutate({ name: name.trim(), year: year ? parseInt(year) : undefined, num_classes: parseInt(numClasses), balance_gender: balanceGender });
   }
 
   return (
@@ -96,6 +97,18 @@ function CreateModal({ onClose, onCreate }: { onClose: () => void; onCreate: (c:
               {errors.numClasses && <span className="form-error">{errors.numClasses}</span>}
             </div>
           </div>
+          <label className="checkbox-field">
+            <input
+              type="checkbox"
+              checked={balanceGender}
+              onChange={(e) => setBalanceGender(e.target.checked)}
+              disabled={mutation.isPending}
+            />
+            <span>
+              Prioritize a balanced mix of boys and girls per class
+              <span className="checkbox-caption">Added as a soft constraint the solver weighs alongside your other preferences.</span>
+            </span>
+          </label>
           {serverError && <span className="form-error">{serverError}</span>}
           <div className="modal-footer">
             <button type="button" className="btn btn-secondary" onClick={onClose} disabled={mutation.isPending}>
@@ -113,6 +126,7 @@ function CreateModal({ onClose, onCreate }: { onClose: () => void; onCreate: (c:
 
 function EditModal({ cohort, onClose }: { cohort: Cohort; onClose: () => void }) {
   const [name, setName] = useState(cohort.name);
+  const [balanceGender, setBalanceGender] = useState(cohort.balance_gender);
   const [error, setError] = useState('');
   const [serverError, setServerError] = useState('');
   const qc = useQueryClient();
@@ -131,13 +145,13 @@ function EditModal({ cohort, onClose }: { cohort: Cohort; onClose: () => void })
     e.preventDefault();
     if (!name.trim()) { setError('Name is required.'); return; }
     setServerError('');
-    mutation.mutate({ name: name.trim() });
+    mutation.mutate({ name: name.trim(), balance_gender: balanceGender });
   }
 
   return (
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal">
-        <h2 className="modal-title">Rename cohort</h2>
+        <h2 className="modal-title">Edit cohort</h2>
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div className="form-field">
             <label className="form-label">Cohort name *</label>
@@ -151,6 +165,18 @@ function EditModal({ cohort, onClose }: { cohort: Cohort; onClose: () => void })
             />
             {error && <span className="form-error">{error}</span>}
           </div>
+          <label className="checkbox-field">
+            <input
+              type="checkbox"
+              checked={balanceGender}
+              onChange={(e) => setBalanceGender(e.target.checked)}
+              disabled={mutation.isPending}
+            />
+            <span>
+              Prioritize a balanced mix of boys and girls per class
+              <span className="checkbox-caption">Added as a soft constraint the solver weighs alongside your other preferences.</span>
+            </span>
+          </label>
           {serverError && <span className="form-error">{serverError}</span>}
           <div className="modal-footer">
             <button type="button" className="btn btn-secondary" onClick={onClose} disabled={mutation.isPending}>

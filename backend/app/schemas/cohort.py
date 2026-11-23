@@ -7,6 +7,7 @@ class CohortCreate(BaseModel):
     name:        str
     year:        Optional[int] = None
     num_classes: int
+    balance_gender: bool = False
 
     @field_validator("name")
     @classmethod
@@ -37,6 +38,7 @@ class CohortUpdate(BaseModel):
     name:        Optional[str] = None
     year:        Optional[int] = None
     num_classes: Optional[int] = None
+    balance_gender: Optional[bool] = None
 
     @field_validator("name")
     @classmethod
@@ -70,6 +72,7 @@ class CohortOut(BaseModel):
     name:          str
     year:          Optional[int]
     num_classes:   int
+    balance_gender: bool
     student_count: int
     created_at:    datetime
     updated_at:    datetime

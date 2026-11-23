@@ -9,16 +9,21 @@ export interface Cohort {
   name: string;
   year: number | null;
   num_classes: number;
+  balance_gender: boolean;
   student_count?: number;
   last_solve_at?: string | null;
   created_at: string;
 }
+
+/** null = unknown: excluded from gender balancing, placed freely. */
+export type Gender = 'boy' | 'girl' | null;
 
 export interface Student {
   id: string;
   first_name: string;
   last_name: string;
   tags: string[];
+  gender: Gender;
   import_source: 'csv' | 'manual';
 }
 
@@ -53,6 +58,13 @@ export interface ClassAssignment {
   class_number: number;
 }
 
+export interface GenderSplit {
+  class_number: number;
+  boys: number;
+  girls: number;
+  unknown: number;
+}
+
 export interface Solution {
   id: string;
   cohort_id: string;
@@ -67,6 +79,7 @@ export interface Solution {
     wall_time_seconds: number;
   };
   class_assignments: ClassAssignment[];
+  gender_split: GenderSplit[];
   created_at: string;
 }
 
@@ -81,7 +94,8 @@ export interface PreviewRow {
   first_name: string;
   last_name: string;
   tags: string[];
-  status: 'ok' | 'duplicate' | 'missing_name' | 'invalid_tag';
+  gender?: Gender;
+  status: 'ok' | 'duplicate' | 'missing_name' | 'invalid_tag' | 'invalid_gender';
   status_message?: string | null;
   preferences: PreferenceMatch[];
 }

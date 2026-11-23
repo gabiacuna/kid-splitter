@@ -1,5 +1,5 @@
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from math import ceil
 from typing import Optional
 
@@ -22,6 +22,11 @@ class SolverInput:
     binary_constraints: list  # BinaryConstraint ORM rows
     unary_constraints:  list  # UnaryConstraint ORM rows
     num_classes:        int
+    gender_map:         dict[str, Optional[str]] = field(default_factory=dict)  # 'boy' | 'girl' | None
+    balance_gender:     bool = False
+
+
+GENDERS = ("boy", "girl")
 
 
 @dataclass
@@ -183,10 +188,57 @@ def _build_model(inp: SolverInput, include_soft: bool, include_diversity: bool) 
                 model.AddMaxEquality(excess, [count_in_k - int(avg_per_class), model.NewConstant(0)])
                 penalty_terms.append(DIVERSITY_WEIGHT * excess)
 
-    if penalty_terms:
-        model.Minimize(sum(penalty_terms))
+    # Gender balance is a strict tiebreaker: it may only choose between assignments
+    # that are equally good on every other term. See _add_gender_balance.
+    preference_penalty = sum(penalty_terms)
+    gender_terms, gender_bound = (
+        _add_gender_balance(model, x, inp)
+        if include_soft and inp.balance_gender
+        else ([], 0)
+    )
 
-    return model, x
+    if gender_terms:
+        model.Minimize((gender_bound + 1) * preference_penalty + sum(gender_terms))
+    elif penalty_terms:
+        model.Minimize(preference_penalty)
+
+    return model, x, preference_penalty
+
+
+def _add_gender_balance(model, x, inp: SolverInput) -> tuple[list, int]:
+    """Per-class squared deviation from target for each known gender.
+
+    Squared, not absolute: with |dev|, (8B, 0B, 4B) and (8B, 2B, 2B) tie when the
+    first class is pinned by preferences; squaring prefers spreading the remainder.
+
+    Returns (penalty vars, an upper bound on their sum). The caller multiplies every
+    other penalty by (bound + 1), so improving any preference — even a 0.1-weight one —
+    always outweighs the best possible gender improvement. That makes "no preference is
+    ever violated solely to improve gender balance" hold by construction, rather than
+    depending on a hand-tuned small weight whose units don't match the other terms.
+
+    Both genders are constrained (not just boys) because students with unknown gender
+    float freely, so fixed class sizes alone don't pin the girl count.
+    Students with gender None are excluded from tallies and targets.
+    """
+    num_classes = inp.num_classes
+    deviations = []
+    bound = 0
+    for g in GENDERS:
+        members = [s for s in inp.student_ids if inp.gender_map.get(s) == g]
+        if not members:
+            continue
+        target = round(len(members) / num_classes)
+        max_dev = max(len(members), target)
+        for k in range(num_classes):
+            count_k = sum(x[s, k] for s in members)
+            dev = model.NewIntVar(0, max_dev, f"gdev_{g}_{k}")
+            model.AddAbsEquality(dev, count_k - target)
+            sq = model.NewIntVar(0, max_dev * max_dev, f"gdev2_{g}_{k}")
+            model.AddMultiplicationEquality(sq, [dev, dev])
+            deviations.append(sq)
+            bound += max_dev * max_dev
+    return deviations, bound
 
 
 def _count_soft_violations(assignments: list[dict], inp: SolverInput) -> int:
@@ -238,7 +290,7 @@ def _count_soft_violations(assignments: list[dict], inp: SolverInput) -> int:
 
 
 def _run_variant(label: str, inp: SolverInput, include_soft: bool, include_diversity: bool) -> SolverResult:
-    model, x = _build_model(inp, include_soft, include_diversity)
+    model, x, preference_penalty = _build_model(inp, include_soft, include_diversity)
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = 8.0
     status = solver.Solve(model)
@@ -261,7 +313,9 @@ def _run_variant(label: str, inp: SolverInput, include_soft: bool, include_diver
                     assignments.append({"student_id": s, "class_number": k + 1})
                     break
 
-    obj = int(solver.ObjectiveValue()) if feasible else None
+    # Report the preference penalty only, so score keeps its meaning with or without
+    # the gender tiebreaker folded into the objective.
+    obj = int(solver.Value(preference_penalty)) if feasible else None
     soft_violations = _count_soft_violations(assignments, inp) if feasible else 0
 
     return SolverResult(

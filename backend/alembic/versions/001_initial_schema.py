@@ -33,6 +33,7 @@ def upgrade() -> None:
         sa.Column("name", sa.String(), nullable=False),
         sa.Column("year", sa.Integer(), nullable=True),
         sa.Column("num_classes", sa.Integer(), nullable=False),
+        sa.Column("balance_gender", sa.Boolean(), nullable=False, server_default=sa.false()),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), onupdate=sa.func.now(), nullable=False),
     )
@@ -46,8 +47,10 @@ def upgrade() -> None:
         sa.Column("last_name", sa.String(), nullable=False),
         sa.Column("tags", sa.ARRAY(sa.String()), server_default="{}"),
         sa.Column("import_source", sa.String(), nullable=True),
+        sa.Column("gender", sa.String(), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), onupdate=sa.func.now(), nullable=False),
+        sa.CheckConstraint("gender IN ('boy', 'girl')", name="student_gender_check"),
     )
     op.create_index("ix_students_cohort_id", "students", ["cohort_id"])
 

@@ -16,7 +16,7 @@ from ..models.student import Student
 from ..models.constraint import BinaryConstraint, UnaryConstraint
 from ..models.solution import Solution, ClassAssignment
 from ..models.teacher import Teacher
-from ..schemas.solve import SolveRequest, SolveResponse, SolutionOut, SolutionDetailOut, SolverMetadata, AssignmentOut
+from ..schemas.solve import SolveRequest, SolveResponse, SolutionOut, SolutionDetailOut, SolverMetadata, AssignmentOut, GenderSplit
 from ..schemas.constraint import ContradictionOut
 from ..services.solver import SolverInput, run_solver
 from ..services.validator import detect_contradictions
@@ -29,7 +29,41 @@ _executor = ThreadPoolExecutor(max_workers=4)
 WEIGHT_SCALE = 100
 
 
-def _solution_out(sol: Solution) -> SolutionOut:
+def _gender_split(
+    assignments: list[tuple[str, int]],
+    gender_map: dict[str, str | None],
+) -> list[GenderSplit]:
+    """Per-class boy/girl/unknown counts. Computed on read so it never goes stale
+    when a student's gender is corrected after solving."""
+    counts: dict[int, dict[str, int]] = {}
+    for student_id, class_number in assignments:
+        c = counts.setdefault(class_number, {"boy": 0, "girl": 0, "unknown": 0})
+        c[gender_map.get(student_id) or "unknown"] += 1
+    return [
+        GenderSplit(class_number=k, boys=c["boy"], girls=c["girl"], unknown=c["unknown"])
+        for k, c in sorted(counts.items())
+    ]
+
+
+async def _gender_map(db: AsyncSession, cohort_id: str) -> dict[str, str | None]:
+    rows = await db.execute(select(Student.id, Student.gender).where(Student.cohort_id == cohort_id))
+    return dict(rows.all())
+
+
+async def _assignments_by_solution(db: AsyncSession, solution_ids: list[str]) -> dict[str, list[tuple[str, int]]]:
+    out: dict[str, list[tuple[str, int]]] = {sid: [] for sid in solution_ids}
+    if not solution_ids:
+        return out
+    rows = await db.execute(
+        select(ClassAssignment.solution_id, ClassAssignment.student_id, ClassAssignment.class_number)
+        .where(ClassAssignment.solution_id.in_(solution_ids))
+    )
+    for solution_id, student_id, class_number in rows.all():
+        out[solution_id].append((student_id, class_number))
+    return out
+
+
+def _solution_out(sol: Solution, gender_split: list[GenderSplit]) -> SolutionOut:
     meta = sol.solver_metadata or {}
     return SolutionOut(
         id=sol.id,
@@ -44,6 +78,7 @@ def _solution_out(sol: Solution) -> SolutionOut:
             objective_value=meta.get("objective_value"),
             status=meta.get("status", "UNKNOWN"),
         ),
+        gender_split=gender_split,
         created_at=sol.created_at,
     )
 
@@ -91,6 +126,7 @@ async def solve(
 
     student_ids = [s.id for s in students]
     tags_map = {s.id: (s.tags or []) for s in students}
+    gender_map = {s.id: s.gender for s in students}
 
     inp = SolverInput(
         student_ids=student_ids,
@@ -98,6 +134,8 @@ async def solve(
         binary_constraints=list(binary),
         unary_constraints=list(unary),
         num_classes=body.num_classes,
+        gender_map=gender_map,
+        balance_gender=cohort.balance_gender,
     )
 
     loop = asyncio.get_event_loop()
@@ -107,7 +145,7 @@ async def solve(
     if not feasible_results:
         raise HTTPException(status_code=422, detail="Solver could not find a feasible solution")
 
-    persisted: list[Solution] = []
+    persisted: list[tuple[Solution, list[GenderSplit]]] = []
     for result in feasible_results:
         if result.hard_violations if hasattr(result, "hard_violations") else False:
             logger.error("Solver returned hard violations for variant %s — skipping persist", result.label)
@@ -137,13 +175,16 @@ async def solve(
                 class_number=assignment["class_number"],
             ))
 
-        persisted.append(sol)
+        split = _gender_split(
+            [(a["student_id"], a["class_number"]) for a in result.assignments], gender_map
+        )
+        persisted.append((sol, split))
 
     await db.commit()
-    for sol in persisted:
+    for sol, _ in persisted:
         await db.refresh(sol)
 
-    return SolveResponse(solutions=[_solution_out(s) for s in persisted])
+    return SolveResponse(solutions=[_solution_out(s, split) for s, split in persisted])
 
 
 @router.get("/cohorts/{cohort_id}/solutions", response_model=list[SolutionOut])
@@ -156,7 +197,10 @@ async def list_solutions(
         .where(Solution.cohort_id == cohort.id)
         .order_by(Solution.created_at.desc())
     )).scalars().all()
-    return [_solution_out(s) for s in solutions]
+    # Two queries total regardless of solution count (no per-solution N+1).
+    gender_map = await _gender_map(db, cohort.id)
+    by_solution = await _assignments_by_solution(db, [s.id for s in solutions])
+    return [_solution_out(s, _gender_split(by_solution[s.id], gender_map)) for s in solutions]
 
 
 @router.get("/solutions/{solution_id}", response_model=SolutionDetailOut)
@@ -179,7 +223,9 @@ async def get_solution(
         select(ClassAssignment).where(ClassAssignment.solution_id == sol.id)
     )).scalars().all()
 
-    out = _solution_out(sol)
+    gender_map = await _gender_map(db, cohort.id)
+    split = _gender_split([(a.student_id, a.class_number) for a in assignments], gender_map)
+    out = _solution_out(sol, split)
     return SolutionDetailOut(
         **out.model_dump(),
         assignments=[AssignmentOut(student_id=a.student_id, class_number=a.class_number) for a in assignments],

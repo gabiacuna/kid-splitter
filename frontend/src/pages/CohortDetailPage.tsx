@@ -174,7 +174,7 @@ export default function CohortDetailPage() {
           ))}
         </div>
 
-        {tab === 'students' && <StudentListTab cohortId={id!} />}
+        {tab === 'students' && <StudentListTab cohortId={id!} balanceGender={cohort.balance_gender} />}
         {tab === 'constraints' && <ConstraintEditorTab cohortId={id!} />}
         {tab === 'solutions' && <SolutionsTab cohortId={id!} numStudents={students.length} />}
       </div>

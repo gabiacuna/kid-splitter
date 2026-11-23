@@ -131,6 +131,12 @@ All 6 router domains are scaffolded and all endpoints exist. The core happy path
 
 ## Changelog
 
+### 2026-11-23 — gender (design features 01–03)
+1. **`students.gender`** (`'boy' | 'girl' | NULL`, CHECK-constrained). `PUT /students/{id}` uses `model_fields_set`, so an explicit `"gender": null` clears it. CSV import reads an optional `gender` column (b/boy/m/male, g/girl/f/female); unrecognised values import as unknown with status `invalid_gender`.
+2. **`cohorts.balance_gender`** (bool, default false) on create/update/out.
+3. **Solver gender balance** for `soft_priority` and `diversity_mix` when the flag is on: squared per-class deviation for each known gender, applied as a strict lexicographic tiebreaker (`(bound+1) × preference_penalty + gender_penalty`) so it can never cost a preference. `score`/`objective_value` report the preference penalty only. Unknown-gender students float.
+4. **`gender_split`** (`boys`/`girls`/`unknown` per class) on every `SolutionOut`, computed on read (not persisted); list endpoint uses two queries regardless of solution count.
+
 ### 2026-11-23
 1. **`num_classes` capped at 2–4** — `CohortCreate`, `CohortUpdate` and `SolveRequest` reject values outside 2–4 (was 2–20). See `docs/design-implementation/10-class-count-cap.md`.
 2. **Migrations folded** — `002_add_unary_constraint_tag` merged into `001_initial_schema`; `002` deleted. Existing dev databases must be recreated (`dropdb kidsplitter && createdb kidsplitter && uv run alembic upgrade head`).

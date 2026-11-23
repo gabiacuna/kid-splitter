@@ -25,6 +25,13 @@ class SolverMetadata(BaseModel):
     status:          str
 
 
+class GenderSplit(BaseModel):
+    class_number: int
+    boys:         int
+    girls:        int
+    unknown:      int
+
+
 class SolutionOut(BaseModel):
     id:              str
     cohort_id:       str
@@ -34,6 +41,7 @@ class SolutionOut(BaseModel):
     soft_violations: int
     share_enabled:   bool
     solver_metadata: SolverMetadata
+    gender_split:    list[GenderSplit]
     created_at:      datetime
 
     model_config = {"from_attributes": True}

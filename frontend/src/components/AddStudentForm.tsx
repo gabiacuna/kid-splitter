@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../lib/api';
+import type { Gender } from '../lib/types';
 
 const TAG_REGEX = /^[a-z0-9-]+$/;
 
@@ -10,6 +11,7 @@ export default function AddStudentForm({ cohortId }: { cohortId: string }) {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [tags, setTags] = useState<string[]>([]);
+  const [gender, setGender] = useState<Gender>(null);
   const [tagInput, setTagInput] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [serverError, setServerError] = useState('');
@@ -20,7 +22,7 @@ export default function AddStudentForm({ cohortId }: { cohortId: string }) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['students', cohortId] });
       qc.invalidateQueries({ queryKey: ['cohorts'] });
-      setFirstName(''); setLastName(''); setTags([]); setErrors({}); setServerError('');
+      setFirstName(''); setLastName(''); setTags([]); setGender(null); setErrors({}); setServerError('');
       setTimeout(() => firstRef.current?.focus(), 50);
     },
     onError: () => setServerError('Failed to add student. Try again.'),
@@ -35,7 +37,7 @@ export default function AddStudentForm({ cohortId }: { cohortId: string }) {
     if (lastName.trim().length > 100) errs.lastName = 'Name must be 100 characters or fewer.';
     if (Object.keys(errs).length) { setErrors(errs); return; }
     setServerError('');
-    mutation.mutate({ first_name: firstName.trim(), last_name: lastName.trim(), tags });
+    mutation.mutate({ first_name: firstName.trim(), last_name: lastName.trim(), tags, gender });
   }
 
   function addTag() {
@@ -66,6 +68,24 @@ export default function AddStudentForm({ cohortId }: { cohortId: string }) {
           <label className="form-label">Last name *</label>
           <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} maxLength={100} disabled={mutation.isPending} placeholder="Smith" />
           {errors.lastName && <span className="form-error">{errors.lastName}</span>}
+        </div>
+      </div>
+      <div className="form-field">
+        <span className="form-label" id="add-student-gender">Gender</span>
+        <div className="dist-toggle" role="radiogroup" aria-labelledby="add-student-gender" style={{ alignSelf: 'flex-start' }}>
+          {([['boy', 'Boy'], ['girl', 'Girl'], [null, 'Not specified']] as [Gender, string][]).map(([value, label]) => (
+            <button
+              key={label}
+              type="button"
+              role="radio"
+              aria-checked={gender === value}
+              className={`dist-toggle-opt${gender === value ? ' active' : ''}`}
+              onClick={() => setGender(value)}
+              disabled={mutation.isPending}
+            >
+              {label}
+            </button>
+          ))}
         </div>
       </div>
       <div className="form-field">

@@ -13,6 +13,7 @@ class Student(Base):
     last_name:     Mapped[str] = mapped_column(String, nullable=False)
     tags:          Mapped[list[str]] = mapped_column(ARRAY(String), server_default="{}")
     import_source: Mapped[str | None] = mapped_column(String, nullable=True)
+    gender:        Mapped[str | None] = mapped_column(String, nullable=True)  # 'boy' | 'girl' | None (unknown)
     created_at:    Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at:    Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 

@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../lib/api';
-import type { Student } from '../lib/types';
+import type { Gender, Student } from '../lib/types';
 import { useToast } from './Toast';
 
 const TAG_REGEX = /^[a-z0-9-]+$/;
@@ -61,6 +61,25 @@ function TagInput({ onAdd }: { onAdd: (tag: string) => void }) {
   );
 }
 
+const NEXT_GENDER: Record<string, Gender> = { none: 'boy', boy: 'girl', girl: null };
+const GENDER_LABEL: Record<string, string> = { boy: 'Boy', girl: 'Girl' };
+
+function GenderCell({ student, onCycle }: { student: Student; onCycle: () => void }) {
+  const g = student.gender;
+  return (
+    <button
+      type="button"
+      className="gender-cycle"
+      data-gender={g ?? 'none'}
+      onClick={onCycle}
+      title="Click to change (Boy → Girl → unknown)"
+      aria-label={`Gender for ${student.first_name} ${student.last_name}: ${g ? GENDER_LABEL[g] : 'unknown'}. Activate to change.`}
+    >
+      {g ? GENDER_LABEL[g] : '—'}
+    </button>
+  );
+}
+
 interface StudentTableProps {
   cohortId: string;
   students: Student[];
@@ -71,6 +90,7 @@ export default function StudentTable({ cohortId, students }: StudentTableProps) 
   const { showToast } = useToast();
   const [savingTags, setSavingTags] = useState<Set<string>>(new Set());
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const genderWrites = useRef(new Map<string, Promise<unknown>>());
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/students/${id}`),
@@ -96,6 +116,30 @@ export default function StudentTable({ cohortId, students }: StudentTableProps) 
     }
   }
 
+  async function cycleGender(studentId: string) {
+    const key = ['students', cohortId];
+    // An in-flight refetch (e.g. after an import) would overwrite the optimistic value.
+    await qc.cancelQueries({ queryKey: key });
+    // Read from the cache, not the render closure: rapid clicks can land before a re-render.
+    const current = qc.getQueryData<Student[]>(key)?.find((s) => s.id === studentId);
+    if (!current) return;
+    const next = NEXT_GENDER[current.gender ?? 'none'];
+    // Optimistic: flip immediately so a teacher can click straight down the column.
+    qc.setQueryData<Student[]>(key, (old) => old?.map((s) => (s.id === studentId ? { ...s, gender: next } : s)));
+
+    // Serialise writes per student so the server ends on the last value clicked,
+    // even if requests would otherwise race on separate connections.
+    const previousWrite = genderWrites.current.get(studentId) ?? Promise.resolve();
+    const write = previousWrite.catch(() => {}).then(() => api.put(`/students/${studentId}`, { gender: next }));
+    genderWrites.current.set(studentId, write);
+    try {
+      await write;
+    } catch {
+      showToast('Failed to update gender.', 'error');
+      qc.invalidateQueries({ queryKey: key }); // resync with the server's truth
+    }
+  }
+
   function handleAddTag(student: Student, tag: string) {
     if (student.tags.includes(tag) || student.tags.length >= 10) return;
     updateTags(student, [...student.tags, tag]);
@@ -114,6 +158,7 @@ export default function StudentTable({ cohortId, students }: StudentTableProps) 
           <tr>
             <th>First name</th>
             <th>Last name</th>
+            <th>Gender</th>
             <th>Tags</th>
             <th>Actions</th>
           </tr>
@@ -126,6 +171,7 @@ export default function StudentTable({ cohortId, students }: StudentTableProps) 
               <tr key={s.id}>
                 <td style={{ fontWeight: 600 }}>{s.first_name}</td>
                 <td>{s.last_name}</td>
+                <td><GenderCell student={s} onCycle={() => cycleGender(s.id)} /></td>
                 <td>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center', opacity: saving ? 0.5 : 1, pointerEvents: saving ? 'none' : undefined }}>
                     {s.tags.map((t) => (
