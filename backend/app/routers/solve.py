@@ -4,7 +4,7 @@ import logging
 from concurrent.futures import ThreadPoolExecutor
 from math import ceil
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from slowapi import Limiter
@@ -20,6 +20,7 @@ from ..models.teacher import Teacher
 from ..schemas.solve import SolveRequest, SolveResponse, SolutionOut, SolutionDetailOut, SolverMetadata, AssignmentOut, GenderSplit
 from ..schemas.constraint import ContradictionOut
 from ..services.solver import SolverInput, run_solver, evaluate_preferences
+from ..services.export import XLSX_MEDIA_TYPE, build_roster_workbook, content_disposition, safe_filename_stem
 from ..services.validator import detect_contradictions, short_display_names
 
 logger = logging.getLogger(__name__)
@@ -257,6 +258,39 @@ async def get_solution(
     ctx = await _cohort_context(db, cohort.id)
     out = _solution_out(sol, [(a.student_id, a.class_number) for a in assignments], ctx)
     return SolutionDetailOut(**out.model_dump())
+
+
+@router.get("/solutions/{solution_id}/export.xlsx")
+async def export_solution(
+    solution_id: str,
+    teacher: Teacher = Depends(current_teacher),
+    db: AsyncSession = Depends(get_db),
+):
+    sol = await db.get(Solution, solution_id)
+    if not sol:
+        raise HTTPException(status_code=404)
+
+    cohort = await db.scalar(
+        select(Cohort).where(Cohort.id == sol.cohort_id, Cohort.teacher_id == teacher.id)
+    )
+    if not cohort:
+        raise HTTPException(status_code=403)
+
+    # Same ordering as GET /cohorts/{id}/students within each class.
+    rows = (await db.execute(
+        select(ClassAssignment.class_number, Student.first_name, Student.last_name)
+        .join(Student, Student.id == ClassAssignment.student_id)
+        .where(ClassAssignment.solution_id == sol.id)
+        .order_by(ClassAssignment.class_number, Student.last_name, Student.first_name)
+    )).all()
+    content = build_roster_workbook([(k, f"{first} {last}".strip()) for k, first, last in rows])
+
+    stem = safe_filename_stem(f"{cohort.name} {sol.label or ''}".strip())
+    return Response(
+        content=content,
+        media_type=XLSX_MEDIA_TYPE,
+        headers={"Content-Disposition": content_disposition(f"{stem}-class-list.xlsx")},
+    )
 
 
 @router.delete("/solutions/{solution_id}", status_code=204)

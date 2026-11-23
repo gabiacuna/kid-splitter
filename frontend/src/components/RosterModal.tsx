@@ -7,7 +7,7 @@ import { classColor, classColorStyle, classLabel } from '../lib/classes';
 import { variantName } from '../lib/solutions';
 import { groupByClass, togetherPairs } from '../lib/roster';
 import { layoutMap, MAP_H, MAP_W } from '../lib/preferenceMap';
-import { CollapseIcon, ExpandIcon } from './Icons';
+import { CollapseIcon, ExpandIcon, SheetIcon } from './Icons';
 
 const FOCUSABLE = 'a[href], button:not([disabled]), input, select, textarea, [tabindex]:not([tabindex="-1"])';
 
@@ -60,6 +60,47 @@ function PreferenceMap({ classes, pairs, names }: {
         ))}
         <span className="pref-legend-note">— lines show paired preferences ({pairs.length})</span>
       </div>
+    </div>
+  );
+}
+
+/** Filename from Content-Disposition, preferring the RFC 5987 form. */
+function downloadName(header: string | undefined, fallback: string) {
+  const star = header?.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
+  if (star) { try { return decodeURIComponent(star); } catch { /* fall through */ } }
+  return header?.match(/filename="([^"]+)"/i)?.[1] ?? fallback;
+}
+
+function ExportButton({ solutionId }: { solutionId: string }) {
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  // Blob rather than a bare link so an expired access token is refreshed by the api client.
+  async function download() {
+    setBusy(true); setFailed(false);
+    try {
+      const res = await api.get(`/solutions/${solutionId}/export.xlsx`, { responseType: 'blob' });
+      const url = URL.createObjectURL(res.data);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = downloadName(res.headers['content-disposition'], 'class-list.xlsx');
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch {
+      setFailed(true);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="export-wrap">
+      {failed && <span className="export-error" role="alert">Download failed — try again</span>}
+      <button type="button" className="export-btn" onClick={download} disabled={busy}>
+        <SheetIcon />{busy ? 'Preparing…' : 'Download .xlsx'}
+      </button>
     </div>
   );
 }
@@ -133,7 +174,10 @@ export default function RosterModal({ solution, onClose }: { solution: Solution;
         ) : (
           <div className="roster-expanded">
             <section className="roster-col">
-              <h3 className="caps-label">Class roster</h3>
+              <div className="roster-col-head">
+                <h3 className="caps-label">Class roster</h3>
+                <ExportButton solutionId={solution.id} />
+              </div>
               <div className="roster-table" role="table" aria-label="Class roster">
                 <div className="roster-table-head" role="row">
                   <span role="columnheader">Class</span><span role="columnheader">Student</span>
@@ -147,7 +191,7 @@ export default function RosterModal({ solution, onClose }: { solution: Solution;
               </div>
             </section>
             <section className="roster-col">
-              <h3 className="caps-label">Preference map</h3>
+              <div className="roster-col-head"><h3 className="caps-label">Preference map</h3></div>
               <PreferenceMap classes={classes} pairs={pairs} names={names} />
             </section>
             <p className="roster-fullpage">

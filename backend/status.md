@@ -131,6 +131,9 @@ All 6 router domains are scaffolded and all endpoints exist. The core happy path
 
 ## Changelog
 
+### 2026-11-23 — roster export (design feature 09)
+1. **`GET /solutions/{id}/export.xlsx`** — real `.xlsx` (openpyxl, new dependency), one sheet `Class | Student`, ordered by class then last/first name. Same ownership check as `GET /solutions/{id}` (404 unknown, 403 other teacher's). Student names are stored as text so `=`/`+`/`-`/`@` prefixes can't become formulas; the filename is derived from cohort name + variant, sanitised, with an RFC 5987 `filename*`. CORS now exposes `Content-Disposition`.
+
 ### 2026-11-23 — solutions (design feature 07)
 1. **Solution responses include `class_assignments`** (list and detail). The list had none and the detail called it `assignments`, so the Solutions tab and the solution page crashed for every solved cohort.
 2. **`score` is now 0–100: share of soft-preference weight honoured**, computed on read against current rules (`evaluate_preferences` in `solver.py`), along with `soft_violations`. The old score was each variant's own objective, not comparable across variants (balanced_sizes always "won").
