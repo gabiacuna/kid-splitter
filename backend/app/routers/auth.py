@@ -1,19 +1,17 @@
 import os
 import httpx
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
-from slowapi import Limiter
-from slowapi.util import get_remote_address
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from ..db import get_db
 from ..dependencies import current_teacher
+from ..limiter import limiter
 from ..models.teacher import Teacher
 from ..schemas.auth import RegisterRequest, LoginRequest, ResendRequest, AuthResponse, RegisterResponse, TeacherOut
 from ..services.supabase_auth import Session, login_outcome, resend_outcome, signup_outcome
 
 router = APIRouter(prefix="/auth", tags=["auth"])
-limiter = Limiter(key_func=get_remote_address)
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "")

@@ -4,13 +4,13 @@ from fastapi import APIRouter, Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
+from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .db import get_db
+from .limiter import limiter
 from .routers import account, auth, cohorts, students, constraints, solve, share
 
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:5173")
@@ -27,8 +27,6 @@ def _resolve_static_dir() -> Path | None:
             return candidate
     return None
 
-
-limiter = Limiter(key_func=get_remote_address)
 
 app = FastAPI(title="Kid Splitter API")
 app.state.limiter = limiter
@@ -54,7 +52,12 @@ api_router.include_router(share.router)
 
 
 @api_router.get("/health")
-async def health(db: AsyncSession = Depends(get_db)):
+async def health():
+    return {"status": "ok"}
+
+
+@api_router.get("/health/ready")
+async def health_ready(db: AsyncSession = Depends(get_db)):
     await db.execute(text("SELECT 1"))
     return {"status": "ok"}
 
