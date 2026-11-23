@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../lib/api';
-import type { Solution, BinaryConstraint, ClassAssignment } from '../lib/types';
+import type { Solution, BinaryConstraint, ClassAssignment, ValidationResult } from '../lib/types';
+import { validationKey } from '../lib/queryKeys';
 import SizeDistributionChart from '../components/SizeDistributionChart';
 import { useToast } from '../components/Toast';
 import { MIN_CLASSES, MAX_CLASSES } from '../lib/classes';
@@ -250,12 +251,14 @@ export default function SolutionsTab({ cohortId, numStudents }: { cohortId: stri
     queryFn: () => api.get(`/cohorts/${cohortId}/constraints`).then((r) => r.data),
   });
 
-  const { data: contradictionData } = useQuery<{ length: number }>({
-    queryKey: ['contradictions', cohortId],
+  // Shared with the constraint editor, which invalidates it after edits settle.
+  const { data: validation } = useQuery<ValidationResult>({
+    queryKey: validationKey(cohortId),
     queryFn: () => api.get(`/cohorts/${cohortId}/constraints/validate`).then((r) => r.data),
   });
 
-  const hasContradictions = Array.isArray(contradictionData) && contradictionData.length > 0;
+  // Previously read an object as an array, so this was always false and solve was never gated.
+  const hasContradictions = validation?.has_contradictions ?? false;
   const binaryConstraints = constraintData?.binary ?? [];
 
   const deleteMutation = useMutation({

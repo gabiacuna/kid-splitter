@@ -41,12 +41,29 @@ export interface UnaryConstraint {
   id: string;
   student_id: string;
   type: 'small_class' | 'large_class' | 'max_flagged_peers' | 'max_conflict_peers';
-  parameter?: number;
+  tag?: string | null;
+  parameter?: number | null;
   is_hard: boolean;
   weight: number;
   notes?: string;
 }
 
+/** One computed conflict: every rule in it shares the badge number `id`. */
+export interface ConflictGroup {
+  id: number;
+  type: 'direct_conflict' | 'chain_conflict' | 'cluster_overflow' | 'coloring_impossible' | 'soft_warning';
+  severity: 'hard' | 'soft';
+  constraint_ids: string[];
+  student_ids: string[];
+  explanation: string;
+}
+
+export interface ValidationResult {
+  has_contradictions: boolean;
+  conflict_groups: ConflictGroup[];
+}
+
+/** @deprecated use ConflictGroup */
 export interface Contradiction {
   type: 'hard_conflict' | 'cluster_too_large' | 'separation_impossible';
   message: string;
