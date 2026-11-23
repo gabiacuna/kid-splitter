@@ -6,7 +6,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from fastapi import HTTPException
 
-from app.services.supabase_auth import login_outcome, resend_outcome, signup_outcome
+from app.services.supabase_auth import (
+    admin_delete_outcome, login_outcome, metadata_update_outcome, password_update_outcome, resend_outcome, signup_outcome,
+)
 
 
 def raises(fn, status):
@@ -53,8 +55,25 @@ def test_resend():
     raises(lambda: resend_outcome(503, {}), 502)
 
 
+def test_account():
+    metadata_update_outcome(200, {})
+    raises(lambda: metadata_update_outcome(401, {}), 401)
+    raises(lambda: metadata_update_outcome(500, {}), 502)
+    password_update_outcome(200, {})
+    raises(lambda: password_update_outcome(422, {"error_code": "same_password"}), 422)
+    raises(lambda: password_update_outcome(422, {"error_code": "weak_password", "msg": "Password too weak"}), 422)
+    raises(lambda: password_update_outcome(401, {}), 401)
+    raises(lambda: password_update_outcome(500, {}), 502)
+    for ok in (200, 204, 404):  # 404: already gone, let local cleanup finish
+        admin_delete_outcome(ok, {})
+    raises(lambda: admin_delete_outcome(401, {}), 503)
+    raises(lambda: admin_delete_outcome(403, {}), 503)
+    raises(lambda: admin_delete_outcome(500, {}), 502)
+
+
 if __name__ == "__main__":
     test_signup()
     test_login()
     test_resend()
+    test_account()
     print("ok")

@@ -5,7 +5,7 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
-from .routers import auth, cohorts, students, constraints, solve, share
+from .routers import account, auth, cohorts, students, constraints, solve, share
 
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:5173")
 
@@ -25,6 +25,7 @@ app.add_middleware(
 )
 
 app.include_router(auth.router)
+app.include_router(account.router)
 app.include_router(cohorts.router)
 app.include_router(students.router)
 app.include_router(constraints.router)

@@ -73,3 +73,37 @@ def resend_outcome(status: int, body: dict) -> None:
         raise HTTPException(status_code=429, detail="Please wait a minute before requesting another email")
     if status >= 500:
         raise HTTPException(status_code=502, detail="Could not send the email right now")
+
+
+def metadata_update_outcome(status: int, body: dict) -> None:
+    """PUT /auth/v1/user with the teacher's own token (keeps school_name in user metadata)."""
+    if status == 200:
+        return
+    if status in (401, 403):
+        raise HTTPException(status_code=401, detail="Session expired — sign in again")
+    raise HTTPException(status_code=502, detail="Could not update your account at the auth provider")
+
+
+def password_update_outcome(status: int, body: dict) -> None:
+    """PUT /auth/v1/user with {"password": ...} using a freshly verified token."""
+    if status == 200:
+        return
+    code = _error_code(body)
+    if code == "same_password":
+        raise HTTPException(status_code=422, detail="New password must be different from your current password")
+    if code == "weak_password":
+        raise HTTPException(status_code=422, detail=body.get("msg") or "Password is too weak")
+    if status in (401, 403):
+        raise HTTPException(status_code=401, detail="Session expired — sign in again")
+    raise HTTPException(status_code=502, detail="Could not update your password at the auth provider")
+
+
+
+def admin_delete_outcome(status: int, body: dict) -> None:
+    """DELETE /auth/v1/admin/users/{id} with the secret key. 404 counts as done
+    (already gone), so a retried deletion can finish the local cleanup."""
+    if status in (200, 204, 404):
+        return
+    if status in (401, 403):
+        raise HTTPException(status_code=503, detail="Account deletion is misconfigured on the server (check SUPABASE_SECRET_KEY)")
+    raise HTTPException(status_code=502, detail="Could not delete your login at the auth provider")

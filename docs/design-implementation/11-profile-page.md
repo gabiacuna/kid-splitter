@@ -1,21 +1,21 @@
-# 11 · Profile page: edit school, delete account
+# 11 · Profile page: edit school, change password, delete account
 
-**Scope:** backend + frontend · **Status:** planned, not started
+**Scope:** backend + frontend · **Status:** implemented
 
-A page where a teacher can change their school name and permanently delete their account
-along with all their data. Not in the design handoff; follows its visual language.
+A page where a teacher can change their school name, change their password, and permanently
+delete their account along with all their data. Not in the design handoff; follows its
+visual language.
 
 ## Where it lives
 
 - Route `/profile`, behind login.
-- The school name in the nav (`Nav.tsx`, `.nav-school`) becomes a link to it — that's where
-  people look for "my account".
-- Two sections on one page: **School** (editable) and **Delete account** (a "danger zone"
-  at the bottom: coral border, separated from everything else).
+- Accessed via a Material Symbols `settings` icon button in the nav (`Nav.tsx`, `.nav-icon-btn`).
+- Three sections on one page: **School** (editable), **Change password**, and **Delete account**
+  (a "danger zone" at the bottom: coral border, separated from everything else).
 
 ## Edit school name
 
-**Backend:** `PUT /auth/me` with `{school_name}`, same validation as registration
+**Backend:** `PUT /account` with `{school_name}`, same validation as registration
 (trimmed, 1–200 chars). Returns the updated `TeacherOut`.
 
 **Also update Supabase.** Login recreates a missing local profile from the Supabase user's
@@ -25,7 +25,23 @@ profile would come back with the *old* school name. So the endpoint also calls S
 token — no admin key needed. Update Supabase first, then the local row.
 
 **Frontend:** inline form with Save; on success update the auth context so the nav changes
-immediately; toast "Saved". Spanish strings in `i18n/es/`.
+immediately; toast "Saved". Spanish strings in `i18n/es/Profile.ts`.
+
+## Change password
+
+**Backend:** `POST /account/password` with `{current_password, new_password}` → `204`,
+rate-limited (`10/hour` per IP).
+
+1. Re-verifies `current_password` via Supabase's password grant (`/auth/v1/token?grant_type=password`).
+   Wrong password returns `403` (not `401`, so the frontend API client doesn't treat it as an
+   expired session and trigger a refresh loop).
+2. Updates the password via `PUT /auth/v1/user` with `{password: new_password}`, authorised
+   with the freshly issued access token (`password_update_outcome` in `services/supabase_auth.py`),
+   and sets the fresh auth cookies on the response.
+
+**Frontend:** inline form on `/profile` with current password, new password (≥ 8 chars,
+different from current), and confirm new password; clears inputs and shows toast
+"Password updated" on success.
 
 ## Delete account and all data
 

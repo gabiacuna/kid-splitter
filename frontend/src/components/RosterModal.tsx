@@ -9,6 +9,7 @@ import { groupByClass, togetherPairs } from '../lib/roster';
 import { layoutMap, MAP_H, MAP_W } from '../lib/preferenceMap';
 import { CollapseIcon, ExpandIcon, SheetIcon } from './Icons';
 import { useT } from '../i18n';
+import { downloadFile } from '../lib/download';
 
 const FOCUSABLE = 'a[href], button:not([disabled]), input, select, textarea, [tabindex]:not([tabindex="-1"])';
 
@@ -70,31 +71,15 @@ function PreferenceMap({ classes, pairs, names }: {
   );
 }
 
-/** Filename from Content-Disposition, preferring the RFC 5987 form. */
-function downloadName(header: string | undefined, fallback: string) {
-  const star = header?.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
-  if (star) { try { return decodeURIComponent(star); } catch { /* fall through */ } }
-  return header?.match(/filename="([^"]+)"/i)?.[1] ?? fallback;
-}
-
 function ExportButton({ solutionId }: { solutionId: string }) {
   const t = useT();
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
 
-  // Blob rather than a bare link so an expired access token is refreshed by the api client.
   async function download() {
     setBusy(true); setFailed(false);
     try {
-      const res = await api.get(`/solutions/${solutionId}/export.xlsx`, { responseType: 'blob' });
-      const url = URL.createObjectURL(res.data);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = downloadName(res.headers['content-disposition'], t('class-list.xlsx'));
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      await downloadFile(`/solutions/${solutionId}/export.xlsx`, t('class-list.xlsx'));
     } catch {
       setFailed(true);
     } finally {

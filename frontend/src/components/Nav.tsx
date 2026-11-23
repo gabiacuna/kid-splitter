@@ -34,6 +34,14 @@ export default function Nav() {
                 </button>
               ))}
             </div>
+            <Link
+              to="/profile"
+              className="nav-icon-btn"
+              title={t('Your profile')}
+              aria-label={t('Your profile')}
+            >
+              <span className="material-symbols-outlined">settings</span>
+            </Link>
             <button className="btn btn-ghost" style={{ padding: '6px 14px', fontSize: 13 }} onClick={logout}>
               {t('Log out')}
             </button>

@@ -48,7 +48,7 @@ These predate the redesign and are worth fixing regardless of whether it proceed
 | 07 | [Solutions comparison redesign](07-solutions-redesign.md) | — | ✅ |
 | 08 | [Class roster modal](08-class-roster-modal.md) | — | ✅ |
 | 09 | [Roster export (.xlsx)](09-roster-export.md) | ✅ | ✅ |
-| 11 | [Profile page: edit school, delete account](11-profile-page.md) | planned | planned |
+| 11 | [Profile page: edit school, change password, delete account](11-profile-page.md) | ✅ | ✅ |
 
 ## Sequencing
 

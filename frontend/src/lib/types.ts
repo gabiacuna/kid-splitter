@@ -4,6 +4,14 @@ export interface Teacher {
   school_name: string;
 }
 
+/** What deleting the account would remove (GET /account/summary). */
+export interface AccountSummary {
+  cohorts: number;
+  students: number;
+  solutions: number;
+  share_links: number;
+}
+
 export interface Cohort {
   id: string;
   name: string;

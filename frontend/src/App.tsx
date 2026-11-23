@@ -9,6 +9,8 @@ import CohortDashboardPage from './pages/CohortDashboardPage'
 import CohortDetailPage from './pages/CohortDetailPage'
 import SolutionDetailPage from './pages/SolutionDetailPage'
 import PublicSharePage from './pages/PublicSharePage'
+import ProfilePage from './pages/ProfilePage'
+import AccountDeletedPage from './pages/AccountDeletedPage'
 import { LanguageProvider } from './i18n'
 
 const queryClient = new QueryClient({
@@ -31,6 +33,8 @@ export default function App() {
                 <Route path="/cohorts" element={<ProtectedRoute><CohortDashboardPage /></ProtectedRoute>} />
                 <Route path="/cohorts/:id" element={<ProtectedRoute><CohortDetailPage /></ProtectedRoute>} />
                 <Route path="/solutions/:id" element={<ProtectedRoute><SolutionDetailPage /></ProtectedRoute>} />
+                <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+                <Route path="/account-deleted" element={<AccountDeletedPage />} />
                 <Route path="/share/:token" element={<PublicSharePage />} />
                 <Route path="*" element={<Navigate to="/cohorts" replace />} />
               </Routes>
