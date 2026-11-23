@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../lib/api';
 import type { ColumnNote, ImportConfirmResponse, ImportPreviewResponse, PreferenceMatch, PreviewRow } from '../lib/types';
 import { useToast } from './Toast';
+import { genderLabel } from '../lib/gender';
 
 function StatusBadge({ status }: { status: PreviewRow['status'] }) {
   if (status === 'ok') return <span className="badge badge-sage">OK</span>;
@@ -106,7 +107,7 @@ function PreferenceCell({
   );
 }
 
-const isErrorRow = (r: PreviewRow) => r.status === 'missing_name' || r.status === 'invalid_tag';
+const isErrorRow = (r: PreviewRow) => !r.importable;
 
 const normName = (s: string) => s.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().split(/\s+/).filter(Boolean).join(' ');
 
@@ -286,6 +287,7 @@ function PreviewModal({
         tags: [],
         gender: null,
         status: 'ok',
+        importable: true,
         status_message: 'Added from a pairing preference',
         preferences: [],
       },
@@ -310,7 +312,7 @@ function PreviewModal({
       row_index: r.row_index,
       first_name: r.first_name,
       last_name: r.last_name,
-      importable: !isErrorRow(r),  // must match what confirm actually imports
+      importable: r.importable,
     }));
     const applyMatch = (match: PreferenceMatch) => setRows((prev) => prev.map((r, i) =>
       i === rowIndex
@@ -390,7 +392,7 @@ function PreviewModal({
                   </td>
                   {hasGender && (
                     <td style={{ fontSize: 12.5, color: row.gender ? undefined : 'var(--text3)' }}>
-                      {row.gender === 'boy' ? 'Boy' : row.gender === 'girl' ? 'Girl' : '—'}
+                      {genderLabel(row.gender)}
                     </td>
                   )}
                   <td style={{ fontSize: 12.5, whiteSpace: 'nowrap' }}>{row.tags.join(', ')}</td>

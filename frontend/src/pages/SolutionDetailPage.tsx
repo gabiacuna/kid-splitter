@@ -8,22 +8,14 @@ import ShareModal from '../components/ShareModal';
 import { useToast } from '../components/Toast';
 import { classColorStyle, classLabel } from '../lib/classes';
 import { variantName } from '../lib/solutions';
-import { groupByClass } from '../lib/roster';
-
-
-function getStudentName(id: string, students: Student[]): string {
-  const s = students.find((x) => x.id === id);
-  return s ? `${s.first_name} ${s.last_name}` : '[Removed student]';
-}
-
+import { groupByClass, studentName } from '../lib/roster';
 
 function computeBinarySatisfaction(
   constraint: BinaryConstraint,
-  assignments: ClassAssignment[]
+  asgn: Map<string, number>,
 ): { satisfied: boolean; classA: number | null; classB: number | null } {
-  const asgn = Object.fromEntries(assignments.map((a) => [a.student_id, a.class_number]));
-  const ca = asgn[constraint.student_a_id] ?? null;
-  const cb = asgn[constraint.student_b_id] ?? null;
+  const ca = asgn.get(constraint.student_a_id) ?? null;
+  const cb = asgn.get(constraint.student_b_id) ?? null;
   if (ca === null || cb === null) return { satisfied: false, classA: ca, classB: cb };
   const satisfied = constraint.type === 'together' ? ca === cb : ca !== cb;
   return { satisfied, classA: ca, classB: cb };
@@ -38,19 +30,22 @@ interface ConstraintSummaryProps {
 function ConstraintSummary({ binary, assignments, students }: ConstraintSummaryProps) {
   const [open, setOpen] = useState(false);
 
+  // Built once per render, not once per rule (CSV imports create hundreds of rules).
+  const asgn = new Map(assignments.map((a) => [a.student_id, a.class_number]));
+  const byId = new Map(students.map((s) => [s.id, s]));
   const results = binary.map((c) => {
-    const { satisfied, classA, classB } = computeBinarySatisfaction(c, assignments);
-    const nameA = getStudentName(c.student_a_id, students);
-    const nameB = getStudentName(c.student_b_id, students);
+    const { satisfied, classA, classB } = computeBinarySatisfaction(c, asgn);
+    const nameA = studentName(byId.get(c.student_a_id));
+    const nameB = studentName(byId.get(c.student_b_id));
     const hardLabel = c.is_hard ? 'hard' : `soft, w${c.weight.toFixed(1)}`;
     const description = `${nameA} + ${nameB}: ${c.type} (${hardLabel})`;
     let detail = satisfied ? 'Satisfied' : '';
     if (!satisfied) {
       if (classA !== null && classB !== null) {
         if (c.type === 'together') {
-          detail = `Violated (${nameA} in Class ${classA}, ${nameB} in Class ${classB})`;
+          detail = `Violated (${nameA} in ${classLabel(classA)}, ${nameB} in ${classLabel(classB)})`;
         } else {
-          detail = `Violated (both in Class ${classA})`;
+          detail = `Violated (both in ${classLabel(classA)})`;
         }
       } else {
         detail = 'Violated (student missing from assignments)';
@@ -171,7 +166,7 @@ export default function SolutionDetailPage() {
   if (!solution) return null;
 
   const effectiveShareEnabled = shareEnabled ?? solution.share_enabled;
-  const effectiveShareToken = shareToken !== null ? shareToken : solution.share_token;
+  const effectiveShareToken = shareToken;
   const binary = constraintData?.binary ?? [];
 
   return (

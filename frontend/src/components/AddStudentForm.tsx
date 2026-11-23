@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../lib/api';
 import type { Gender } from '../lib/types';
+import { genderLabel } from '../lib/gender';
 
 const TAG_REGEX = /^[a-z0-9-]+$/;
 
@@ -73,7 +74,7 @@ export default function AddStudentForm({ cohortId }: { cohortId: string }) {
       <div className="form-field">
         <span className="form-label" id="add-student-gender">Gender</span>
         <div className="dist-toggle" role="radiogroup" aria-labelledby="add-student-gender" style={{ alignSelf: 'flex-start' }}>
-          {([['boy', 'Boy'], ['girl', 'Girl'], [null, 'Not specified']] as [Gender, string][]).map(([value, label]) => (
+          {(['boy', 'girl', null] as Gender[]).map((value) => [value, genderLabel(value, 'Not specified')] as const).map(([value, label]) => (
             <button
               key={label}
               type="button"

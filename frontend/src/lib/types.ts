@@ -10,9 +10,10 @@ export interface Cohort {
   year: number | null;
   num_classes: number;
   balance_gender: boolean;
-  student_count?: number;
-  last_solve_at?: string | null;
+  student_count: number;
+  last_solve_at: string | null;
   created_at: string;
+  updated_at: string;
 }
 
 /** null = unknown: excluded from gender balancing, placed freely. */
@@ -20,11 +21,13 @@ export type Gender = 'boy' | 'girl' | null;
 
 export interface Student {
   id: string;
+  cohort_id: string;
   first_name: string;
   last_name: string;
   tags: string[];
   gender: Gender;
-  import_source: 'csv' | 'manual';
+  import_source: string | null;
+  created_at: string;
 }
 
 export interface BinaryConstraint {
@@ -45,7 +48,6 @@ export interface UnaryConstraint {
   parameter?: number | null;
   is_hard: boolean;
   weight: number;
-  notes?: string;
 }
 
 /** One computed conflict: every rule in it shares the badge number `id`. */
@@ -63,12 +65,6 @@ export interface ValidationResult {
   conflict_groups: ConflictGroup[];
 }
 
-/** @deprecated use ConflictGroup */
-export interface Contradiction {
-  type: 'hard_conflict' | 'cluster_too_large' | 'separation_impossible';
-  message: string;
-  student_ids: string[];
-}
 
 export interface ClassAssignment {
   student_id: string;
@@ -89,11 +85,11 @@ export interface Solution {
   score: number;
   hard_violations: number;
   soft_violations: number;
-  share_token: string | null;
   share_enabled: boolean;
   solver_metadata: {
-    status: 'OPTIMAL' | 'FEASIBLE';
-    wall_time_seconds: number;
+    status: 'OPTIMAL' | 'FEASIBLE' | 'INFEASIBLE' | 'UNKNOWN';
+    wall_time_s: number;
+    objective_value: number | null;
   };
   class_assignments: ClassAssignment[];
   gender_split: GenderSplit[];
@@ -121,6 +117,8 @@ export interface PreviewRow {
   tags: string[];
   gender?: Gender;
   status: 'ok' | 'duplicate' | 'missing_name' | 'invalid_tag' | 'invalid_gender';
+  /** Server-decided: confirm imports exactly the rows where this is true. */
+  importable: boolean;
   status_message?: string | null;
   preferences: PreferenceMatch[];
 }
@@ -151,6 +149,8 @@ export interface PublicClass {
 }
 
 export interface PublicSolutionData {
+  solution_id: string;
   cohort_name: string;
+  label: string;
   classes: PublicClass[];
 }

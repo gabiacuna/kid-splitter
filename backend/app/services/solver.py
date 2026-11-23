@@ -229,7 +229,9 @@ def _add_gender_balance(model, x, inp: SolverInput) -> tuple[list, int]:
         if not members:
             continue
         target = round(len(members) / num_classes)
-        max_dev = max(len(members), target)
+        # A class holds at most ceil(total/k) students, so the count can't exceed that;
+        # a tight bound keeps the lexicographic multiplier (bound + 1) small for CP-SAT.
+        max_dev = max(target, min(len(members), ceil(len(inp.student_ids) / num_classes)) - target)
         for k in range(num_classes):
             count_k = sum(x[s, k] for s in members)
             dev = model.NewIntVar(0, max_dev, f"gdev_{g}_{k}")

@@ -36,6 +36,7 @@
 
   --sage: oklch(60% 0.09 155);
   --sage-light: oklch(93% 0.06 155);
+  --sage-dark: oklch(42% 0.09 155);
 
   --lavender: oklch(55% 0.1 270);
   --lavender-light: oklch(93% 0.05 270);
@@ -258,9 +259,7 @@ input:focus, select:focus, textarea:focus {
 }
 .badge-teal { background: var(--teal-light); color: var(--teal-dark); }
 .badge-sage { background: var(--sage-light); color: var(--sage); }
-.badge-coral { background: var(--coral-light); color: var(--coral); }
 .badge-warn { background: var(--warn); color: var(--warn-text); }
-.badge-lavender { background: var(--lavender-light); color: var(--lavender); }
 .badge-red { background: #fee2e2; color: #b91c1c; }
 
 /* Editable / removable preference chips (unmatched CSV pairings) */
@@ -491,11 +490,6 @@ input:focus, select:focus, textarea:focus {
   gap: 14px;
   border: 1.5px solid var(--border);
 }
-.cohort-card-header {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-}
 .cohort-icon {
   width: 40px;
   height: 40px;
@@ -512,13 +506,6 @@ input:focus, select:focus, textarea:focus {
   font-weight: 700;
   letter-spacing: -0.2px;
   line-height: 1.3;
-}
-.cohort-meta {
-  font-size: 12.5px;
-  color: var(--text3);
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
 }
 
 /* Card menu (kebab) */
@@ -603,40 +590,6 @@ tr:hover td { background: var(--bg); }
 
 
 
-/* Bar chart */
-.bar-chart {
-  display: flex;
-  gap: 6px;
-  align-items: flex-end;
-  height: 50px;
-}
-.bar-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 3px;
-  flex: 1;
-}
-.bar-track {
-  width: 100%;
-  background: var(--bg2);
-  border-radius: 4px;
-  overflow: hidden;
-  height: 36px;
-  display: flex;
-  align-items: flex-end;
-}
-.bar-fill {
-  width: 100%;
-  background: var(--class-color, var(--teal));
-  border-radius: 4px;
-  transition: height 0.3s;
-}
-.bar-label {
-  font-size: 11px;
-  color: var(--text3);
-  font-weight: 600;
-}
 
 /* Empty state */
 .empty-state {
@@ -869,7 +822,7 @@ input[type='range'] {
   border-radius: 999px; border: none; font-weight: 600; font-size: 13px; text-align: center;
   padding: 6px 10px; cursor: pointer;
 }
-.type-select.together { background: var(--sage-light); color: oklch(42% 0.09 155); }
+.type-select.together { background: var(--sage-light); color: var(--sage-dark); }
 .type-select.separate { background: var(--coral-light); color: var(--coral); }
 
 .hard-check { display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; cursor: pointer; }
@@ -938,7 +891,7 @@ input[type='range'] {
 .cohort-card-top .cohort-icon { margin-right: auto; font-size: 0; }
 .cohort-card-top .card-menu { margin-left: 0; }
 .status-pill { font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 20px; margin-top: 2px; }
-.status-pill.active { background: var(--sage-light); color: oklch(42% 0.09 155); }
+.status-pill.active { background: var(--sage-light); color: var(--sage-dark); }
 .status-pill.draft { background: var(--lavender-light); color: var(--lavender); }
 .cohort-card h2.cohort-name { margin: 0; }
 .cohort-sub { font-size: 13px; color: var(--text3); margin-top: 2px; }

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
+from starlette.concurrency import run_in_threadpool
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from math import ceil
 
 from ..db import get_db
 from ..dependencies import current_teacher, get_cohort_or_403
@@ -12,7 +12,7 @@ from ..models.teacher import Teacher
 from ..schemas.constraint import (
     BinaryConstraintCreate, BinaryConstraintUpdate, BinaryConstraintOut,
     UnaryConstraintCreate, UnaryConstraintUpdate, UnaryConstraintOut,
-    ConstraintListOut, ValidationOut, ContradictionOut, ConflictGroupOut,
+    ConstraintListOut, ValidationOut, ConflictGroupOut,
 )
 from ..services.validator import detect_conflicts, short_display_names
 
@@ -217,7 +217,8 @@ async def validate_constraints(
     )).all()
     names = short_display_names(students)
 
-    groups = detect_conflicts(list(binary), cohort.num_classes, len(students), names)
+    # The exact colouring check can take up to its time limit; keep it off the event loop.
+    groups = await run_in_threadpool(detect_conflicts, list(binary), cohort.num_classes, len(students), names)
     return ValidationOut(
         has_contradictions=any(g.severity == "hard" for g in groups),
         conflict_groups=[
@@ -225,10 +226,6 @@ async def validate_constraints(
                 id=g.id, type=g.type, severity=g.severity,
                 constraint_ids=g.constraint_ids, student_ids=g.student_ids, explanation=g.explanation,
             )
-            for g in groups
-        ],
-        contradictions=[
-            ContradictionOut(type=g.type, message=g.explanation, student_ids=g.student_ids)
             for g in groups
         ],
     )

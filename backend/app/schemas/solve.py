@@ -48,9 +48,5 @@ class SolutionOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class SolutionDetailOut(SolutionOut):
-    """Kept as a name for the detail endpoint; every SolutionOut now carries assignments."""
-
-
 class SolveResponse(BaseModel):
     solutions: list[SolutionOut]

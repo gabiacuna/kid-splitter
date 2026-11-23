@@ -130,12 +130,6 @@ class ConstraintListOut(BaseModel):
     unary:  list[UnaryConstraintOut]
 
 
-class ContradictionOut(BaseModel):
-    type:        str
-    message:     str
-    student_ids: list[str]
-
-
 class ConflictGroupOut(BaseModel):
     id:             int
     type:           str
@@ -148,4 +142,3 @@ class ConflictGroupOut(BaseModel):
 class ValidationOut(BaseModel):
     has_contradictions: bool
     conflict_groups:    list[ConflictGroupOut]
-    contradictions:     list[ContradictionOut]  # deprecated: drop after the frontend moves to conflict_groups

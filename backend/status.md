@@ -131,6 +131,13 @@ All 6 router domains are scaffolded and all endpoints exist. The core happy path
 
 ## Changelog
 
+### 2026-11-23 — cleanup
+1. **Public share page fixed** — `GET /share/{token}` returns `classes` as a list of `{class_number, students}` (it was a dict keyed by class, which the page couldn't iterate). Stale `score`/`soft_violations` are no longer exposed publicly.
+2. **Removed the deprecated `contradictions` field** from `/constraints/validate` and the `detect_contradictions` wrapper; solve's pre-check uses `detect_conflicts` (422 detail now lists `conflicts` explanations). The colouring check runs in a thread pool.
+3. **`get_solution_or_403` dependency** replaces five copies of the solution ownership check (solve, export, delete, share create/revoke).
+4. **Import preview rows carry `importable`** (server decides; duplicates are importable, as the UI already did). Preference matching uses a precomputed `NameIndex` (500 students × 3 preferences: ~7.5s → ~0.2s).
+5. Dashboard list uses correlated subqueries instead of a students × solutions join; solve loads the cohort once; tighter gender-balance bound.
+
 ### 2026-11-23 — roster export (design feature 09)
 1. **`GET /solutions/{id}/export.xlsx`** — real `.xlsx` (openpyxl, new dependency), one sheet `Class | Student`, ordered by class then last/first name. Same ownership check as `GET /solutions/{id}` (404 unknown, 403 other teacher's). Student names are stored as text so `=`/`+`/`-`/`@` prefixes can't become formulas; the filename is derived from cohort name + variant, sanitised, with an RFC 5987 `filename*`. CORS now exposes `Content-Disposition`.
 

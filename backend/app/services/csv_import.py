@@ -2,6 +2,7 @@ import csv
 import io
 import re
 import unicodedata
+from collections import defaultdict
 from difflib import SequenceMatcher
 from dataclasses import dataclass, field
 from typing import Optional
@@ -32,8 +33,10 @@ _PREFERENCE_PREFIXES = ("preferenc", "pair with")  # preferences, preferencia 1,
 # Lower-case particles that belong to the following surname word ("De La Cruz").
 _SURNAME_PARTICLES = {"de", "del", "la", "las", "los", "y", "san", "van", "von", "da", "di", "le"}
 
-# invalid_gender rows are still imported (with gender=None); only the value is dropped.
-IMPORTABLE_STATUSES = ("ok", "invalid_gender")
+# Rows the confirm step imports. invalid_gender keeps the row (gender=None); duplicates are
+# imported too (the teacher sees the warning and can remove the row). Single source of truth:
+# the preview sends `importable` per row so the client never re-derives it.
+IMPORTABLE_STATUSES = ("ok", "invalid_gender", "duplicate")
 
 
 @dataclass
@@ -145,39 +148,61 @@ def parse_preferences(raw: str) -> list[str]:
     return seen[:MAX_PREFERENCES]
 
 
-def match_preference(name: str, candidates: list[Candidate], self_key: Optional[str]) -> PreferenceMatchResult:
-    """Full name first; fall back to a unique first-name match."""
+@dataclass
+class _Entry:
+    candidate: Candidate
+    forms:     set[str]   # normalised full-name forms
+    words:     set[str]
+
+
+class NameIndex:
+    """Roster names normalised once, so each preference is a dict lookup instead of
+    re-normalising every candidate (500 students × 3 preferences took ~7s before).
+
+    Keys, in priority order:
+      full     'emma baasch lopez', 'baasch lopez emma', 'emma baasch' (given + first surname)
+      initial  'renata l'  (given + first-surname initial)
+      first    'emma'      (given name alone; only a match if unique)
+    """
+
+    def __init__(self, candidates: list[Candidate]) -> None:
+        self.entries: list[_Entry] = []
+        self.full: dict[str, list[Candidate]] = defaultdict(list)
+        self.initial: dict[str, list[Candidate]] = defaultdict(list)
+        self.first: dict[str, list[Candidate]] = defaultdict(list)
+        for c in candidates:
+            units = _name_units(c.last)
+            first_surname = units[0] if units else c.last
+            first = normalize_name(c.first)
+            forms = {
+                normalize_name(c.display),
+                normalize_name(f"{c.last} {c.first}"),
+                normalize_name(f"{c.first} {first_surname}"),
+            }
+            for f in forms:
+                self.full[f].append(c)
+            if first_surname:
+                self.initial[f"{first} {normalize_name(first_surname)[:1]}"].append(c)
+            self.first[first].append(c)
+            self.entries.append(_Entry(c, forms, set(normalize_name(c.display).split())))
+
+
+def match_preference(name: str, index: NameIndex, self_key: Optional[str]) -> PreferenceMatchResult:
+    """Full name first, then given name + surname initial, then a unique given name."""
     target = normalize_name(name)
-    pool = [c for c in candidates if c.key != self_key]
+    initial_key = target.rstrip(".")
 
-    def forms(c: Candidate) -> set[str]:
-        units = _name_units(c.last)
-        first_surname = units[0] if units else c.last
-        return {
-            normalize_name(c.display),                     # Emma Baasch López
-            normalize_name(f"{c.last} {c.first}"),         # Baasch López Emma
-            normalize_name(f"{c.first} {first_surname}"),  # Emma Baasch  (common in school lists)
-        }
+    def hits(bucket: dict[str, list[Candidate]], key: str) -> list[Candidate]:
+        return [c for c in bucket.get(key, ()) if c.key != self_key]
 
-    def initial_match(c: Candidate) -> bool:
-        # "Renata L" / "Renata L." -> given name + first-surname initial
-        given, _, initial = target.rpartition(" ")
-        initial = initial.rstrip(".")
-        units = _name_units(c.last)
-        return (
-            len(initial) == 1 and normalize_name(c.first) == given
-            and bool(units) and normalize_name(units[0]).startswith(initial)
-        )
-
-    full = [c for c in pool if target in forms(c)]
-    hits = (
-        full
-        or [c for c in pool if initial_match(c)]
-        or [c for c in pool if normalize_name(c.first) == target]
+    found = (
+        hits(index.full, target)
+        or (hits(index.initial, initial_key) if len(initial_key.rpartition(" ")[2]) == 1 else [])
+        or hits(index.first, target)
     )
 
     # The same person can appear twice (e.g. already in cohort and re-uploaded); collapse by name.
-    distinct = {normalize_name(c.display): c for c in hits}
+    distinct = {normalize_name(c.display): c for c in found}
     if len(distinct) == 1:
         c = next(iter(distinct.values()))
         return PreferenceMatchResult(name, "matched", c.display, c.key)
@@ -186,21 +211,24 @@ def match_preference(name: str, candidates: list[Candidate], self_key: Optional[
             name, "ambiguous",
             suggestions=sorted(c.display for c in distinct.values())[:MAX_SUGGESTIONS * 2],
         )
-    return PreferenceMatchResult(name, "unresolved", suggestions=_suggest(target, pool, forms))
+    return PreferenceMatchResult(name, "unresolved", suggestions=_suggest(target, index, self_key))
 
 
-def _suggest(target: str, pool: list[Candidate], forms) -> list[str]:
+def _suggest(target: str, index: NameIndex, self_key: Optional[str]) -> list[str]:
     """Closest roster names for a name that matched nobody: typos ("Irente" ~ "Irene")
     score by similarity, and sharing a whole word ("Jacinta Lobos" -> Jacinta Latuz,
     Catalina Lobos) also counts, so the teacher can say which student was meant."""
     words = set(target.split())
     scored: dict[str, float] = {}
-    for c in pool:
-        ratio = max(SequenceMatcher(None, target, f).ratio() for f in forms(c))
-        shared = words & set(normalize_name(c.display).split())
+    for e in index.entries:
+        if e.candidate.key == self_key:
+            continue
+        ratio = max(SequenceMatcher(None, target, f).ratio() for f in e.forms)
+        shared = words & e.words
         score = max(ratio, 0.6 + 0.1 * len(shared) if shared else 0.0)
         if score >= 0.6:
-            scored[c.display] = max(score, scored.get(c.display, 0.0))
+            d = e.candidate.display
+            scored[d] = max(score, scored.get(d, 0.0))
     return [d for d, _ in sorted(scored.items(), key=lambda kv: (-kv[1], kv[0]))[:MAX_SUGGESTIONS]]
 
 

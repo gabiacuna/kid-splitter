@@ -6,6 +6,12 @@ from urllib.parse import quote
 from openpyxl import Workbook
 from openpyxl.styles import Font
 
+from .csv_import import CSV_INJECTION_CHARS
+
+# CSV import rejects these as name prefixes; export also covers tab/CR, which Excel can
+# treat as formula starters too.
+FORMULA_PREFIXES = CSV_INJECTION_CHARS + ("\t", "\r")
+
 XLSX_MEDIA_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 
@@ -37,7 +43,7 @@ def build_roster_workbook(rows: list[tuple[int, str]]) -> bytes:
     for row in ws.iter_rows(min_row=2):
         for cell in row:
             cell.data_type = "s"
-            if str(cell.value)[:1] in ("=", "+", "-", "@", "\t", "\r"):
+            if str(cell.value)[:1] in FORMULA_PREFIXES:
                 cell.quotePrefix = True
     ws.freeze_panes = "A2"
     longest = max((len(n) for _, n in rows), default=0)

@@ -31,13 +31,6 @@ class ConflictGroup:
     explanation:    str
 
 
-@dataclass
-class Contradiction:
-    """Legacy shape, kept for one release (see docs/design-implementation/04)."""
-    type:        str
-    message:     str
-    student_ids: list[str]
-
 
 # ---------------------------------------------------------------------------
 # helpers
@@ -274,15 +267,3 @@ def detect_conflicts(
             ))
     return groups
 
-
-def detect_contradictions(
-    binary_constraints: list["BinaryConstraint"],
-    num_classes: int,
-    total_students: int,
-    names: Optional[dict[str, str]] = None,
-) -> list[Contradiction]:
-    """Legacy wrapper over detect_conflicts (callers filter on type != 'soft_warning')."""
-    return [
-        Contradiction(type=g.type, message=g.explanation, student_ids=g.student_ids)
-        for g in detect_conflicts(binary_constraints, num_classes, total_students, names)
-    ]

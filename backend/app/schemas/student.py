@@ -118,6 +118,7 @@ class ImportPreviewRow(BaseModel):
     gender:         Optional[Gender] = None
     status:         str
     status_message: Optional[str] = None
+    importable:     bool = True   # decided by the server; the client imports exactly these rows
     preferences:    list[PreferenceMatchOut] = []
 
 

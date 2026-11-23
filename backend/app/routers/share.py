@@ -8,12 +8,11 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 
 from ..db import get_db
-from ..dependencies import current_teacher
+from ..dependencies import get_solution_or_403
 from ..models.cohort import Cohort
 from ..models.student import Student
 from ..models.solution import Solution, ClassAssignment
-from ..models.teacher import Teacher
-from ..schemas.share import ShareTokenOut, PublicSolutionOut, PublicAssignmentOut
+from ..schemas.share import ShareTokenOut, PublicSolutionOut, PublicClassOut, PublicStudentOut
 
 router = APIRouter(tags=["share"])
 limiter = Limiter(key_func=get_remote_address)
@@ -24,19 +23,10 @@ WHITELISTED_TAGS = {"esl", "gifted", "new-student"}
 
 @router.post("/solutions/{solution_id}/share", response_model=ShareTokenOut, status_code=201)
 async def create_share_token(
-    solution_id: str,
-    teacher: Teacher = Depends(current_teacher),
+    owned: tuple[Solution, Cohort] = Depends(get_solution_or_403),
     db: AsyncSession = Depends(get_db),
 ):
-    sol = await db.get(Solution, solution_id)
-    if not sol:
-        raise HTTPException(status_code=404)
-
-    cohort = await db.scalar(
-        select(Cohort).where(Cohort.id == sol.cohort_id, Cohort.teacher_id == teacher.id)
-    )
-    if not cohort:
-        raise HTTPException(status_code=403)
+    sol, _ = owned
 
     if sol.share_token and sol.share_enabled:
         return ShareTokenOut(
@@ -61,19 +51,10 @@ async def create_share_token(
 
 @router.delete("/solutions/{solution_id}/share", status_code=204)
 async def revoke_share_token(
-    solution_id: str,
-    teacher: Teacher = Depends(current_teacher),
+    owned: tuple[Solution, Cohort] = Depends(get_solution_or_403),
     db: AsyncSession = Depends(get_db),
 ):
-    sol = await db.get(Solution, solution_id)
-    if not sol:
-        raise HTTPException(status_code=404)
-
-    cohort = await db.scalar(
-        select(Cohort).where(Cohort.id == sol.cohort_id, Cohort.teacher_id == teacher.id)
-    )
-    if not cohort:
-        raise HTTPException(status_code=403)
+    sol, _ = owned
 
     sol.share_token = None
     sol.share_enabled = False
@@ -100,21 +81,17 @@ async def get_shared_solution(token: str, request: Request, db: AsyncSession = D
         .where(ClassAssignment.solution_id == sol.id)
     )).all()
 
-    classes: dict[int, list[PublicAssignmentOut]] = {}
+    by_class: dict[int, list[PublicStudentOut]] = {}
     for assignment, student in assignments:
         safe_tags = [t for t in (student.tags or []) if t in WHITELISTED_TAGS]
-        entry = PublicAssignmentOut(
-            first_name=student.first_name,
-            class_number=assignment.class_number,
-            tags=safe_tags,
+        by_class.setdefault(assignment.class_number, []).append(
+            PublicStudentOut(first_name=student.first_name, tags=safe_tags)
         )
-        classes.setdefault(assignment.class_number, []).append(entry)
 
+    # A list (not a dict keyed by class) — the share page iterates it.
     return PublicSolutionOut(
         solution_id=sol.id,
         cohort_name=cohort.name if cohort else "",
         label=sol.label or "",
-        score=sol.score or 0.0,
-        soft_violations=sol.soft_violations or 0,
-        classes=classes,
+        classes=[PublicClassOut(class_number=k, students=v) for k, v in sorted(by_class.items())],
     )

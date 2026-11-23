@@ -8,6 +8,7 @@ import os
 from .db import get_db
 from .models.teacher import Teacher
 from .models.cohort import Cohort
+from .models.solution import Solution
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "")
@@ -62,3 +63,20 @@ async def get_cohort_or_403(
     if not cohort:
         raise HTTPException(status_code=403)
     return cohort
+
+
+async def get_solution_or_403(
+    solution_id: str,
+    teacher: Teacher = Depends(current_teacher),
+    db: AsyncSession = Depends(get_db),
+) -> tuple[Solution, Cohort]:
+    """404 if the solution doesn't exist, 403 if it belongs to another teacher."""
+    sol = await db.get(Solution, solution_id)
+    if not sol:
+        raise HTTPException(status_code=404)
+    cohort = await db.scalar(
+        select(Cohort).where(Cohort.id == sol.cohort_id, Cohort.teacher_id == teacher.id)
+    )
+    if not cohort:
+        raise HTTPException(status_code=403)
+    return sol, cohort

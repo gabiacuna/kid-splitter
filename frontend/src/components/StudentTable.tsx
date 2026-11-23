@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../lib/api';
-import type { Gender, Student } from '../lib/types';
+import type { Student } from '../lib/types';
+import { genderLabel, nextGender } from '../lib/gender';
 import { useToast } from './Toast';
 
 const TAG_REGEX = /^[a-z0-9-]+$/;
@@ -61,8 +62,6 @@ function TagInput({ onAdd }: { onAdd: (tag: string) => void }) {
   );
 }
 
-const NEXT_GENDER: Record<string, Gender> = { none: 'boy', boy: 'girl', girl: null };
-const GENDER_LABEL: Record<string, string> = { boy: 'Boy', girl: 'Girl' };
 
 function GenderCell({ student, onCycle }: { student: Student; onCycle: () => void }) {
   const g = student.gender;
@@ -73,9 +72,9 @@ function GenderCell({ student, onCycle }: { student: Student; onCycle: () => voi
       data-gender={g ?? 'none'}
       onClick={onCycle}
       title="Click to change (Boy → Girl → unknown)"
-      aria-label={`Gender for ${student.first_name} ${student.last_name}: ${g ? GENDER_LABEL[g] : 'unknown'}. Activate to change.`}
+      aria-label={`Gender for ${student.first_name} ${student.last_name}: ${genderLabel(g, 'unknown')}. Activate to change.`}
     >
-      {g ? GENDER_LABEL[g] : '—'}
+      {genderLabel(g)}
     </button>
   );
 }
@@ -90,7 +89,14 @@ export default function StudentTable({ cohortId, students }: StudentTableProps) 
   const { showToast } = useToast();
   const [savingTags, setSavingTags] = useState<Set<string>>(new Set());
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
-  const genderWrites = useRef(new Map<string, Promise<unknown>>());
+  // Per-student write queue: tag and gender edits reach the server in click order.
+  const writes = useRef(new Map<string, Promise<unknown>>());
+  function enqueueWrite(studentId: string, body: object) {
+    const write = (writes.current.get(studentId) ?? Promise.resolve()).catch(() => {})
+      .then(() => api.put(`/students/${studentId}`, body));
+    writes.current.set(studentId, write);
+    return write;
+  }
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/students/${id}`),
@@ -107,7 +113,7 @@ export default function StudentTable({ cohortId, students }: StudentTableProps) 
   async function updateTags(student: Student, tags: string[]) {
     setSavingTags((prev) => new Set(prev).add(student.id));
     try {
-      await api.put(`/students/${student.id}`, { tags });
+      await enqueueWrite(student.id, { tags });
       qc.invalidateQueries({ queryKey: ['students', cohortId] });
     } catch {
       showToast('Failed to update tags.', 'error');
@@ -123,17 +129,12 @@ export default function StudentTable({ cohortId, students }: StudentTableProps) 
     // Read from the cache, not the render closure: rapid clicks can land before a re-render.
     const current = qc.getQueryData<Student[]>(key)?.find((s) => s.id === studentId);
     if (!current) return;
-    const next = NEXT_GENDER[current.gender ?? 'none'];
+    const next = nextGender(current.gender);
     // Optimistic: flip immediately so a teacher can click straight down the column.
     qc.setQueryData<Student[]>(key, (old) => old?.map((s) => (s.id === studentId ? { ...s, gender: next } : s)));
 
-    // Serialise writes per student so the server ends on the last value clicked,
-    // even if requests would otherwise race on separate connections.
-    const previousWrite = genderWrites.current.get(studentId) ?? Promise.resolve();
-    const write = previousWrite.catch(() => {}).then(() => api.put(`/students/${studentId}`, { gender: next }));
-    genderWrites.current.set(studentId, write);
     try {
-      await write;
+      await enqueueWrite(studentId, { gender: next });
     } catch {
       showToast('Failed to update gender.', 'error');
       qc.invalidateQueries({ queryKey: key }); // resync with the server's truth

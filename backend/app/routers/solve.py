@@ -2,32 +2,29 @@ import asyncio
 from dataclasses import dataclass
 import logging
 from concurrent.futures import ThreadPoolExecutor
-from math import ceil
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
 from ..db import get_db
-from ..dependencies import current_teacher, get_cohort_or_403
+from ..dependencies import current_teacher, get_cohort_or_403, get_solution_or_403
 from ..models.cohort import Cohort
 from ..models.student import Student
 from ..models.constraint import BinaryConstraint, UnaryConstraint
 from ..models.solution import Solution, ClassAssignment
 from ..models.teacher import Teacher
-from ..schemas.solve import SolveRequest, SolveResponse, SolutionOut, SolutionDetailOut, SolverMetadata, AssignmentOut, GenderSplit
-from ..schemas.constraint import ContradictionOut
+from ..schemas.solve import SolveRequest, SolveResponse, SolutionOut, SolverMetadata, AssignmentOut, GenderSplit
 from ..services.solver import SolverInput, run_solver, evaluate_preferences
 from ..services.export import XLSX_MEDIA_TYPE, build_roster_workbook, content_disposition, safe_filename_stem, VARIANT_NAMES
-from ..services.validator import detect_contradictions, short_display_names
+from ..services.validator import detect_conflicts, short_display_names
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["solve"])
 limiter = Limiter(key_func=lambda request: request.state.teacher_id if hasattr(request.state, "teacher_id") else get_remote_address(request))
 _executor = ThreadPoolExecutor(max_workers=4)
-
 
 
 def _gender_split(
@@ -69,19 +66,25 @@ class _CohortContext:
     unary:       list
 
 
-async def _cohort_context(db: AsyncSession, cohort_id: str) -> _CohortContext:
-    students = (await db.execute(
-        select(Student.id, Student.tags, Student.gender).where(Student.cohort_id == cohort_id)
-    )).all()
+async def _load_cohort(db: AsyncSession, cohort_id: str) -> tuple[list[Student], list, list]:
+    students = (await db.execute(select(Student).where(Student.cohort_id == cohort_id))).scalars().all()
     binary = (await db.execute(select(BinaryConstraint).where(BinaryConstraint.cohort_id == cohort_id))).scalars().all()
     unary = (await db.execute(select(UnaryConstraint).where(UnaryConstraint.cohort_id == cohort_id))).scalars().all()
+    return list(students), list(binary), list(unary)
+
+
+def _context_from(students: list[Student], binary: list, unary: list) -> _CohortContext:
     return _CohortContext(
         student_ids=[s.id for s in students],
         tags_map={s.id: (s.tags or []) for s in students},
         gender_map={s.id: s.gender for s in students},
-        binary=list(binary),
-        unary=list(unary),
+        binary=binary,
+        unary=unary,
     )
+
+
+async def _cohort_context(db: AsyncSession, cohort_id: str) -> _CohortContext:
+    return _context_from(*await _load_cohort(db, cohort_id))
 
 
 def _solution_out(sol: Solution, assignments: list[tuple[str, int]], ctx: _CohortContext) -> SolutionOut:
@@ -121,77 +124,53 @@ async def solve(
     teacher: Teacher = Depends(current_teacher),
     db: AsyncSession = Depends(get_db),
 ):
-    total_students = await db.scalar(
-        select(func.count(Student.id)).where(Student.cohort_id == cohort.id)
-    ) or 0
-
-    if total_students <= body.num_classes:
+    # One load of the cohort serves the pre-check, the solver and the response.
+    students, binary, unary = await _load_cohort(db, cohort.id)
+    if len(students) <= body.num_classes:
         raise HTTPException(status_code=422, detail="total_students must be greater than num_classes")
 
-    binary = (await db.execute(
-        select(BinaryConstraint).where(BinaryConstraint.cohort_id == cohort.id)
-    )).scalars().all()
-    unary = (await db.execute(
-        select(UnaryConstraint).where(UnaryConstraint.cohort_id == cohort.id)
-    )).scalars().all()
-
-    name_rows = (await db.execute(
-        select(Student.id, Student.first_name, Student.last_name).where(Student.cohort_id == cohort.id)
-    )).all()
-    contradictions = detect_contradictions(
-        list(binary), body.num_classes, total_students, short_display_names(name_rows)
+    loop = asyncio.get_running_loop()
+    names = short_display_names((s.id, s.first_name, s.last_name) for s in students)
+    groups = await loop.run_in_executor(
+        _executor, detect_conflicts, binary, body.num_classes, len(students), names
     )
-    hard = [c for c in contradictions if c.type != "soft_warning"]
+    hard = [g for g in groups if g.severity == "hard"]
     if hard:
         raise HTTPException(
             status_code=422,
             detail={
                 "message": "Hard contradictions prevent solving",
-                "contradictions": [
-                    {"type": c.type, "message": c.message, "student_ids": c.student_ids}
-                    for c in hard
-                ],
+                "conflicts": [g.explanation for g in hard],
             },
         )
 
-    students = (await db.execute(
-        select(Student).where(Student.cohort_id == cohort.id)
-    )).scalars().all()
-
-    student_ids = [s.id for s in students]
-    tags_map = {s.id: (s.tags or []) for s in students}
-    gender_map = {s.id: s.gender for s in students}
-
+    ctx = _context_from(students, binary, unary)
     inp = SolverInput(
-        student_ids=student_ids,
-        tags_map=tags_map,
-        binary_constraints=list(binary),
-        unary_constraints=list(unary),
+        student_ids=ctx.student_ids,
+        tags_map=ctx.tags_map,
+        binary_constraints=binary,
+        unary_constraints=unary,
         num_classes=body.num_classes,
-        gender_map=gender_map,
+        gender_map=ctx.gender_map,
         balance_gender=cohort.balance_gender,
     )
 
-    loop = asyncio.get_event_loop()
     results = await loop.run_in_executor(_executor, run_solver, inp)
 
     feasible_results = [r for r in results if r.feasible]
     if not feasible_results:
         raise HTTPException(status_code=422, detail="Solver could not find a feasible solution")
 
-    persisted: list[tuple[Solution, list[GenderSplit]]] = []
+    persisted: list[tuple[Solution, list[tuple[str, int]]]] = []
     for result in feasible_results:
-        if result.hard_violations if hasattr(result, "hard_violations") else False:
-            logger.error("Solver returned hard violations for variant %s — skipping persist", result.label)
-            continue
-
-        score = evaluate_preferences(result.assignments, inp).score
+        # score/soft_violations columns are a snapshot; responses recompute them on read.
+        evaluation = evaluate_preferences(result.assignments, inp)
         sol = Solution(
             cohort_id=cohort.id,
             label=result.label,
-            score=score,
+            score=evaluation.score,
             hard_violations=0,
-            soft_violations=result.soft_violations,
+            soft_violations=evaluation.violations,
             share_enabled=False,
             solver_metadata={
                 "wall_time_s": result.wall_time_s,
@@ -215,7 +194,6 @@ async def solve(
     for sol, _ in persisted:
         await db.refresh(sol)
 
-    ctx = await _cohort_context(db, cohort.id)
     return SolveResponse(solutions=[_solution_out(s, asg, ctx) for s, asg in persisted])
 
 
@@ -235,46 +213,22 @@ async def list_solutions(
     return [_solution_out(s, by_solution[s.id], ctx) for s in solutions]
 
 
-@router.get("/solutions/{solution_id}", response_model=SolutionDetailOut)
+@router.get("/solutions/{solution_id}", response_model=SolutionOut)
 async def get_solution(
-    solution_id: str,
-    teacher: Teacher = Depends(current_teacher),
+    owned: tuple[Solution, Cohort] = Depends(get_solution_or_403),
     db: AsyncSession = Depends(get_db),
 ):
-    sol = await db.get(Solution, solution_id)
-    if not sol:
-        raise HTTPException(status_code=404)
-
-    cohort = await db.scalar(
-        select(Cohort).where(Cohort.id == sol.cohort_id, Cohort.teacher_id == teacher.id)
-    )
-    if not cohort:
-        raise HTTPException(status_code=403)
-
-    assignments = (await db.execute(
-        select(ClassAssignment).where(ClassAssignment.solution_id == sol.id)
-    )).scalars().all()
-
-    ctx = await _cohort_context(db, cohort.id)
-    out = _solution_out(sol, [(a.student_id, a.class_number) for a in assignments], ctx)
-    return SolutionDetailOut(**out.model_dump())
+    sol, cohort = owned
+    assignments = (await _assignments_by_solution(db, [sol.id]))[sol.id]
+    return _solution_out(sol, assignments, await _cohort_context(db, cohort.id))
 
 
 @router.get("/solutions/{solution_id}/export.xlsx")
 async def export_solution(
-    solution_id: str,
-    teacher: Teacher = Depends(current_teacher),
+    owned: tuple[Solution, Cohort] = Depends(get_solution_or_403),
     db: AsyncSession = Depends(get_db),
 ):
-    sol = await db.get(Solution, solution_id)
-    if not sol:
-        raise HTTPException(status_code=404)
-
-    cohort = await db.scalar(
-        select(Cohort).where(Cohort.id == sol.cohort_id, Cohort.teacher_id == teacher.id)
-    )
-    if not cohort:
-        raise HTTPException(status_code=403)
+    sol, cohort = owned
 
     # Same ordering as GET /cohorts/{id}/students within each class.
     rows = (await db.execute(
@@ -296,19 +250,9 @@ async def export_solution(
 
 @router.delete("/solutions/{solution_id}", status_code=204)
 async def delete_solution(
-    solution_id: str,
-    teacher: Teacher = Depends(current_teacher),
+    owned: tuple[Solution, Cohort] = Depends(get_solution_or_403),
     db: AsyncSession = Depends(get_db),
 ):
-    sol = await db.get(Solution, solution_id)
-    if not sol:
-        raise HTTPException(status_code=404)
-
-    cohort = await db.scalar(
-        select(Cohort).where(Cohort.id == sol.cohort_id, Cohort.teacher_id == teacher.id)
-    )
-    if not cohort:
-        raise HTTPException(status_code=403)
-
+    sol, _ = owned
     await db.delete(sol)
     await db.commit()

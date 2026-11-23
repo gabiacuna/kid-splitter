@@ -7,20 +7,23 @@ import { validationKey } from '../lib/queryKeys';
 import { useToast } from '../components/Toast';
 import { MIN_CLASSES, MAX_CLASSES, classColor, classLabel } from '../lib/classes';
 import { VARIANTS, variantName, rankSolutions } from '../lib/solutions';
+import { ACCENTS } from '../lib/cohortTint';
 import RosterModal from '../components/RosterModal';
 
 // Score accent by rank (not threshold), so three 90+ scores still read as ranked.
-const RANK_ACCENTS = [
-  { fg: 'var(--teal)', bg: 'var(--teal-light)' },
-  { fg: 'oklch(48% 0.1 155)', bg: 'var(--sage-light)' },
-  { fg: 'var(--lavender)', bg: 'var(--lavender-light)' },
-];
+const RANK_ACCENTS = ACCENTS.slice(0, 3);
 
-function classSizes(solution: Solution): number[] {
-  const n = Math.max(1, ...solution.class_assignments.map((a) => a.class_number));
-  const sizes = Array(n).fill(0);
-  for (const a of solution.class_assignments) sizes[a.class_number - 1]++;
-  return sizes;
+// gender_split already counts every student per class, so sizes come from it too —
+// the size bars and the gender bars can't disagree.
+const classSizes = (solution: Solution) => solution.gender_split.map((c) => c.boys + c.girls + c.unknown);
+
+function distributionSummary(total: number, n: number) {
+  if (!n || n < 2) return '';
+  const base = Math.floor(total / n);
+  const rem = total % n;
+  if (rem === 0) return `${n} classes (${base} students each)`;
+  const sizes = [...Array(rem).fill(base + 1), ...Array(n - rem).fill(base)];
+  return `${n} classes (${sizes.join(' / ')})`;
 }
 
 function ClassSizeBars({ solution }: { solution: Solution }) {
@@ -162,15 +165,6 @@ function SolvePanel({ cohortId, hasContradictions, totalStudents, onSolved }: { 
   const resolvedNum = mode === 'num_classes'
     ? parseInt(numClasses) || 0
     : Math.ceil(totalStudents / (parseInt(targetSize) || 1));
-
-  function distributionSummary(total: number, n: number) {
-    if (!n || n < 2) return '';
-    const base = Math.floor(total / n);
-    const rem = total % n;
-    if (rem === 0) return `${n} classes (${base} students each)`;
-    const sizes = [...Array(rem).fill(base + 1), ...Array(n - rem).fill(base)];
-    return `${n} classes (${sizes.join(' / ')})`;
-  }
 
   let disabledReason = '';
   if (hasContradictions) disabledReason = 'Resolve constraint contradictions before solving.';

@@ -1,5 +1,4 @@
 from pydantic import BaseModel
-from typing import Optional
 
 
 class ShareTokenOut(BaseModel):
@@ -9,16 +8,19 @@ class ShareTokenOut(BaseModel):
     share_enabled: bool
 
 
-class PublicAssignmentOut(BaseModel):
-    first_name:   str
+class PublicStudentOut(BaseModel):
+    first_name: str
+    tags:       list[str]
+
+
+class PublicClassOut(BaseModel):
     class_number: int
-    tags:         list[str]
+    students:     list[PublicStudentOut]
 
 
 class PublicSolutionOut(BaseModel):
-    solution_id:     str
-    cohort_name:     str
-    label:           str
-    score:           float
-    soft_violations: int
-    classes:         dict[int, list[PublicAssignmentOut]]
+    """Names-only view. Score/violation numbers are deliberately not exposed publicly."""
+    solution_id: str
+    cohort_name: str
+    label:       str
+    classes:     list[PublicClassOut]

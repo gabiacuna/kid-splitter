@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
@@ -25,6 +25,10 @@ async def _last_solve_at(db: AsyncSession, cohort_id: str):
     )
 
 
+async def _cohort_out(db: AsyncSession, cohort: Cohort) -> CohortOut:
+    return _build_out(cohort, await _student_count(db, cohort.id), await _last_solve_at(db, cohort.id))
+
+
 def _build_out(cohort: Cohort, count: int, last_solve_at=None) -> CohortOut:
     return CohortOut(
         id=cohort.id,
@@ -44,17 +48,17 @@ async def list_cohorts(
     teacher: Teacher = Depends(current_teacher),
     db: AsyncSession = Depends(get_db),
 ):
-    # One query: DISTINCT because the solutions join multiplies student rows.
+    # Correlated scalar subqueries: joining students and solutions together would
+    # multiply rows (students × solutions per cohort) just to collapse them again.
+    student_count = (
+        select(func.count(Student.id)).where(Student.cohort_id == Cohort.id).correlate(Cohort).scalar_subquery()
+    )
+    last_solve_at = (
+        select(func.max(Solution.created_at)).where(Solution.cohort_id == Cohort.id).correlate(Cohort).scalar_subquery()
+    )
     stmt = (
-        select(
-            Cohort,
-            func.count(func.distinct(Student.id)).label("student_count"),
-            func.max(Solution.created_at).label("last_solve_at"),
-        )
-        .outerjoin(Student, Student.cohort_id == Cohort.id)
-        .outerjoin(Solution, Solution.cohort_id == Cohort.id)
+        select(Cohort, student_count, last_solve_at)
         .where(Cohort.teacher_id == teacher.id)
-        .group_by(Cohort.id)
         .order_by(Cohort.created_at.desc())
     )
     rows = (await db.execute(stmt)).all()
@@ -86,8 +90,7 @@ async def get_cohort(
     cohort: Cohort = Depends(get_cohort_or_403),
     db: AsyncSession = Depends(get_db),
 ):
-    count = await _student_count(db, cohort.id)
-    return _build_out(cohort, count, await _last_solve_at(db, cohort.id))
+    return await _cohort_out(db, cohort)
 
 
 @router.put("/{cohort_id}")
@@ -117,8 +120,7 @@ async def update_cohort(
 
     await db.commit()
     await db.refresh(cohort)
-    count = await _student_count(db, cohort.id)
-    out = _build_out(cohort, count, await _last_solve_at(db, cohort.id))
+    out = await _cohort_out(db, cohort)
 
     if warning:
         return {"cohort": out.model_dump(), "warning": warning}

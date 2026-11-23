@@ -14,7 +14,7 @@ from ..schemas.student import (
     PreferenceMatchOut, RematchRequest, ColumnNoteOut,
 )
 from ..services.csv_import import (
-    parse_csv_preview, IMPORTABLE_STATUSES, Candidate, match_preference,
+    parse_csv_preview, IMPORTABLE_STATUSES, Candidate, NameIndex, PreferenceMatchResult, match_preference,
 )
 
 router = APIRouter(tags=["students"])
@@ -35,6 +35,15 @@ async def _verify_student_ownership(
     if not student:
         raise HTTPException(status_code=403)
     return student
+
+
+def _match_out(m: PreferenceMatchResult) -> PreferenceMatchOut:
+    return PreferenceMatchOut(name=m.name, status=m.status, matched_display=m.matched_display, suggestions=m.suggestions)
+
+
+def _row_candidates(rows) -> list[Candidate]:
+    """Upload rows as match candidates, keyed by row so a student can't match themself."""
+    return [Candidate(key=f"row:{r.row_index}", first=r.first_name.strip(), last=r.last_name.strip()) for r in rows]
 
 
 async def _existing_candidates(db: AsyncSession, cohort_id: str) -> list[Candidate]:
@@ -101,20 +110,15 @@ async def import_preview(
         raise HTTPException(status_code=422, detail=str(e))
 
     rows = preview.rows
-    candidates = existing_students + [
-        Candidate(key=f"row:{r.row_index}", first=r.first_name, last=r.last_name)
-        for r in rows if r.status in IMPORTABLE_STATUSES
-    ]
+    index = NameIndex(existing_students + _row_candidates(r for r in rows if r.status in IMPORTABLE_STATUSES))
 
     preview_rows = []
     matched = unresolved = 0
     for r in rows:
         prefs = []
         for name in r.preferences:
-            m = match_preference(name, candidates, self_key=f"row:{r.row_index}")
-            prefs.append(PreferenceMatchOut(
-                name=m.name, status=m.status, matched_display=m.matched_display, suggestions=m.suggestions,
-            ))
+            m = match_preference(name, index, self_key=f"row:{r.row_index}")
+            prefs.append(_match_out(m))
             if m.status == "matched":
                 matched += 1
             else:
@@ -127,10 +131,11 @@ async def import_preview(
             gender=r.gender,
             status=r.status,
             status_message=r.status_message,
+            importable=r.status in IMPORTABLE_STATUSES,
             preferences=prefs,
         ))
 
-    ok_count = sum(1 for r in preview_rows if r.status in IMPORTABLE_STATUSES)
+    ok_count = sum(1 for r in preview_rows if r.importable)
     return ImportPreviewResponse(
         rows=preview_rows,
         total=len(preview_rows),
@@ -149,14 +154,8 @@ async def import_rematch(
     db: AsyncSession = Depends(get_db),
 ):
     """Re-resolve one preference name after the teacher edits it in the preview."""
-    candidates = await _existing_candidates(db, cohort.id) + [
-        Candidate(key=f"row:{r.row_index}", first=r.first_name.strip(), last=r.last_name.strip())
-        for r in body.rows if r.importable
-    ]
-    m = match_preference(body.name, candidates, self_key=f"row:{body.self_row_index}")
-    return PreferenceMatchOut(
-        name=m.name, status=m.status, matched_display=m.matched_display, suggestions=m.suggestions,
-    )
+    index = NameIndex(await _existing_candidates(db, cohort.id) + _row_candidates(r for r in body.rows if r.importable))
+    return _match_out(match_preference(body.name, index, self_key=f"row:{body.self_row_index}"))
 
 
 @router.post("/cohorts/{cohort_id}/students/import/confirm", response_model=ImportConfirmResponse, status_code=201)
@@ -182,7 +181,7 @@ async def import_confirm(
 
     # Preferences become soft "together" constraints. Names are resolved again here
     # (the client only sends names) against the same pool the preview used.
-    candidates = existing + [Candidate(key=s.id, first=s.first_name, last=s.last_name) for s in students]
+    index = NameIndex(existing + [Candidate(key=s.id, first=s.first_name, last=s.last_name) for s in students])
     existing_pairs = {
         frozenset(p) for p in (await db.execute(
             select(BinaryConstraint.student_a_id, BinaryConstraint.student_b_id)
@@ -192,7 +191,7 @@ async def import_confirm(
     new_pairs: set[frozenset[str]] = set()
     for s, row in zip(students, body.students):
         for name in row.preferences:
-            m = match_preference(name, candidates, self_key=s.id)
+            m = match_preference(name, index, self_key=s.id)
             if m.status != "matched" or not m.matched_key:
                 continue
             pair = frozenset((s.id, m.matched_key))
