@@ -43,6 +43,14 @@
   --coral: oklch(52% 0.12 25);
   --coral-light: oklch(93% 0.05 25);
 
+  /* Class identity palette (2–4 classes). Validated as a categorical set on
+     white card + --bg2 track; see docs/design-implementation/10-class-count-cap.md.
+     Read via classColor() in src/lib/classes.ts — never per component. */
+  --class-1: oklch(58% 0.13 190);  /* teal   #00918b */
+  --class-2: oklch(75% 0.15 75);   /* amber  #e49e22 */
+  --class-3: oklch(50% 0.15 275);  /* indigo #4d57b7 */
+  --class-4: oklch(58% 0.16 28);   /* coral  #c74c41 */
+
   --warn: oklch(88% 0.12 88);
   --warn-border: oklch(78% 0.14 75);
   --warn-text: oklch(38% 0.09 75);
@@ -681,8 +689,7 @@ tr:hover td { background: var(--bg); }
 }
 .bar-fill {
   width: 100%;
-  background: var(--teal);
-  opacity: 0.75;
+  background: var(--class-color, var(--teal));
   border-radius: 4px;
   transition: height 0.3s;
 }
@@ -771,6 +778,7 @@ input[type='range'] {
 }
 .roster-class-header {
   background: var(--teal-light);
+  border-top: 4px solid var(--class-color, var(--teal));
   padding: 10px 14px;
   display: flex;
   align-items: center;

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import api from '../lib/api'
 import type { PublicSolutionData } from '../lib/types'
+import { classColorStyle } from '../lib/classes';
 
 export default function PublicSharePage() {
   const { token } = useParams<{ token: string }>()
@@ -57,7 +58,7 @@ export default function PublicSharePage() {
       <p style={{ fontSize: 13.5, color: 'var(--text3)', marginBottom: 32 }}>Shared view · Names only</p>
       <div className="roster-grid">
         {data.classes.map((cls) => (
-          <div key={cls.class_number} className="roster-class-card">
+          <div key={cls.class_number} className="roster-class-card" style={classColorStyle(cls.class_number)}>
             <div className="roster-class-header">
               <span>Class {cls.class_number}</span>
               <span style={{ fontWeight: 500, opacity: 0.75 }}>{cls.students.length} students</span>

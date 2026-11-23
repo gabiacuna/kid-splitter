@@ -75,8 +75,8 @@ class CohortCreate(BaseModel):
     @field_validator("num_classes")
     @classmethod
     def valid_num_classes(cls, v: int) -> int:
-        if v < 2 or v > 20:
-            raise ValueError("num_classes must be between 2 and 20")
+        if v < 2 or v > 4:
+            raise ValueError("num_classes must be between 2 and 4")
         return v
 
     @field_validator("year")
@@ -119,10 +119,10 @@ class CohortListOut(BaseModel):
 |---|---|---|---|---|
 | CohortCreate | name | str | ✅ | Stripped, non-empty, max 200 chars |
 | CohortCreate | year | int | ❌ | 2000–2100 if provided |
-| CohortCreate | num_classes | int | ✅ | 2–20 inclusive |
+| CohortCreate | num_classes | int | ✅ | 2–4 inclusive |
 | CohortUpdate | name | str | ❌ | Same as above if provided |
 | CohortUpdate | year | int | ❌ | Same as above if provided |
-| CohortUpdate | num_classes | int | ❌ | 2–20 if provided |
+| CohortUpdate | num_classes | int | ❌ | 2–4 if provided |
 | CohortOut | student_count | int | — | Computed at query time |
 
 ---

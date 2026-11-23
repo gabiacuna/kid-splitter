@@ -1,4 +1,5 @@
 import type { ClassAssignment } from '../lib/types';
+import { classColorStyle } from '../lib/classes';
 
 interface Props {
   assignments: ClassAssignment[];
@@ -16,7 +17,7 @@ export default function SizeDistributionChart({ assignments, numClasses }: Props
   return (
     <div className="bar-chart">
       {sizes.map((size, i) => (
-        <div key={i} className="bar-item">
+        <div key={i} className="bar-item" style={classColorStyle(i + 1)}>
           <span className="bar-label">{size}</span>
           <div className="bar-track">
             <div className="bar-fill" style={{ height: `${(size / max) * 100}%` }} />

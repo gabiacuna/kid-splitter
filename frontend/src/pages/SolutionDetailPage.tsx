@@ -6,6 +6,7 @@ import type { BinaryConstraint, ClassAssignment, Solution, Student, UnaryConstra
 import Nav from '../components/Nav';
 import ShareModal from '../components/ShareModal';
 import { useToast } from '../components/Toast';
+import { classColorStyle } from '../lib/classes';
 
 function classLabel(classNum: number): string {
   return `Class ${classNum}`;
@@ -119,7 +120,7 @@ function ClassRoster({ assignments, students }: ClassRosterProps) {
           return na.localeCompare(nb);
         });
         return (
-          <div key={cn} className="roster-class-card">
+          <div key={cn} className="roster-class-card" style={classColorStyle(cn)}>
             <div className="roster-class-header">
               <span>{classLabel(cn)}</span>
               <span style={{ fontWeight: 500 }}>{members.length} students</span>

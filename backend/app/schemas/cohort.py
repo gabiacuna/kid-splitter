@@ -21,8 +21,8 @@ class CohortCreate(BaseModel):
     @field_validator("num_classes")
     @classmethod
     def valid_num_classes(cls, v: int) -> int:
-        if v < 2 or v > 20:
-            raise ValueError("num_classes must be between 2 and 20")
+        if v < 2 or v > 4:
+            raise ValueError("num_classes must be between 2 and 4")
         return v
 
     @field_validator("year")
@@ -53,8 +53,8 @@ class CohortUpdate(BaseModel):
     @field_validator("num_classes")
     @classmethod
     def valid_num_classes(cls, v: Optional[int]) -> Optional[int]:
-        if v is not None and (v < 2 or v > 20):
-            raise ValueError("num_classes must be between 2 and 20")
+        if v is not None and (v < 2 or v > 4):
+            raise ValueError("num_classes must be between 2 and 4")
         return v
 
     @field_validator("year")

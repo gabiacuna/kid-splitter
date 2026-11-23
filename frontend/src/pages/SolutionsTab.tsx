@@ -5,6 +5,7 @@ import api from '../lib/api';
 import type { Solution, BinaryConstraint, ClassAssignment } from '../lib/types';
 import SizeDistributionChart from '../components/SizeDistributionChart';
 import { useToast } from '../components/Toast';
+import { MIN_CLASSES, MAX_CLASSES } from '../lib/classes';
 
 function computeSatisfied(constraint: BinaryConstraint, assignments: ClassAssignment[]) {
   const asgn = Object.fromEntries(assignments.map((a) => [a.student_id, a.class_number]));
@@ -156,7 +157,8 @@ function SolvePanel({ cohortId, hasContradictions, totalStudents, onSolved }: { 
   let disabledReason = '';
   if (hasContradictions) disabledReason = 'Resolve constraint contradictions before solving.';
   else if (totalStudents === 0) disabledReason = 'Add students before solving.';
-  else if (!resolvedNum || resolvedNum < 2) disabledReason = 'Minimum 2 classes.';
+  else if (!resolvedNum || resolvedNum < MIN_CLASSES) disabledReason = `Minimum ${MIN_CLASSES} classes.`;
+  else if (resolvedNum > MAX_CLASSES) disabledReason = `Maximum ${MAX_CLASSES} classes — raise the target class size.`;
   else if (resolvedNum >= totalStudents) disabledReason = `Number of classes cannot exceed number of students (${totalStudents}).`;
 
   async function handleSolve() {
@@ -195,7 +197,7 @@ function SolvePanel({ cohortId, hasContradictions, totalStudents, onSolved }: { 
       {mode === 'num_classes' ? (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
           <span style={{ fontSize: 13.5 }}>Split into</span>
-          <input type="number" min={2} max={20} value={numClasses} onChange={(e) => setNumClasses(e.target.value)} style={{ width: 70 }} />
+          <input type="number" min={MIN_CLASSES} max={MAX_CLASSES} value={numClasses} onChange={(e) => setNumClasses(e.target.value)} style={{ width: 70 }} />
           <span style={{ fontSize: 13.5 }}>classes</span>
         </div>
       ) : (
@@ -206,7 +208,7 @@ function SolvePanel({ cohortId, hasContradictions, totalStudents, onSolved }: { 
         </div>
       )}
 
-      {totalStudents > 0 && resolvedNum >= 2 && resolvedNum < totalStudents && (
+      {totalStudents > 0 && resolvedNum >= MIN_CLASSES && resolvedNum <= MAX_CLASSES && resolvedNum < totalStudents && (
         <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 14 }}>
           → {totalStudents} students will be split into {distributionSummary(totalStudents, resolvedNum)}
         </p>

@@ -88,8 +88,8 @@ class SolveRequest(BaseModel):
     @field_validator("num_classes")
     @classmethod
     def valid_num_classes(cls, v: int) -> int:
-        if v < 2 or v > 20:
-            raise ValueError("num_classes must be between 2 and 20")
+        if v < 2 or v > 4:
+            raise ValueError("num_classes must be between 2 and 4")
         return v
 ```
 
@@ -131,7 +131,7 @@ class SolveResponse(BaseModel):
 
 | Schema | Field | Type | Required | Notes |
 |---|---|---|---|---|
-| SolveRequest | num_classes | int | ✅ | 2–20; resolved by frontend before sending |
+| SolveRequest | num_classes | int | ✅ | 2–4; resolved by frontend before sending |
 | SolutionOut | hard_violations | int | — | Must always be 0 in a persisted solution |
 | SolutionOut | score | float | — | Lower is better |
 | SolverMetadata | status | str | — | `OPTIMAL` preferred; `FEASIBLE` if 8s timeout hit |

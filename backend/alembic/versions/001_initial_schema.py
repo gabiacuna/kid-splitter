@@ -73,6 +73,7 @@ def upgrade() -> None:
         sa.Column("cohort_id", sa.String(), sa.ForeignKey("cohorts.id", ondelete="CASCADE"), nullable=False),
         sa.Column("student_id", sa.String(), sa.ForeignKey("students.id", ondelete="CASCADE"), nullable=False),
         sa.Column("type", sa.String(), nullable=False),
+        sa.Column("tag", sa.String(), nullable=True),
         sa.Column("parameter", sa.Integer(), nullable=True),
         sa.Column("is_hard", sa.Boolean(), nullable=False, default=False),
         sa.Column("weight", sa.Float(), default=1.0),

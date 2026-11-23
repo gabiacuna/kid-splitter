@@ -131,6 +131,10 @@ All 6 router domains are scaffolded and all endpoints exist. The core happy path
 
 ## Changelog
 
+### 2026-11-23
+1. **`num_classes` capped at 2–4** — `CohortCreate`, `CohortUpdate` and `SolveRequest` reject values outside 2–4 (was 2–20). See `docs/design-implementation/10-class-count-cap.md`.
+2. **Migrations folded** — `002_add_unary_constraint_tag` merged into `001_initial_schema`; `002` deleted. Existing dev databases must be recreated (`dropdb kidsplitter && createdb kidsplitter && uv run alembic upgrade head`).
+
 ### 2026-07-02
 1. **Supabase JWT verification migrated to JWKS** — access tokens are verified as ES256 against the project's JWKS endpoint; the legacy `SUPABASE_JWT_SECRET` is no longer used.
 2. **Auth refresh endpoint added** — `POST /auth/refresh` exchanges the refresh cookie with Supabase and rotates both auth cookies.

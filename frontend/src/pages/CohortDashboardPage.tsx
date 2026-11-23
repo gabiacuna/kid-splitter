@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../lib/api';
 import type { Cohort } from '../lib/types';
 import Nav from '../components/Nav';
+import { MIN_CLASSES, MAX_CLASSES } from '../lib/classes';
 
 function SkeletonCard() {
   return (
@@ -37,7 +38,7 @@ function CreateModal({ onClose, onCreate }: { onClose: () => void; onCreate: (c:
     const errs: Record<string, string> = {};
     if (!name.trim()) errs.name = 'Name is required.';
     const n = parseInt(numClasses);
-    if (!numClasses || n < 2 || n > 20) errs.numClasses = 'Between 2 and 20 classes.';
+    if (!numClasses || n < MIN_CLASSES || n > MAX_CLASSES) errs.numClasses = `Between ${MIN_CLASSES} and ${MAX_CLASSES} classes.`;
     return errs;
   }
 
@@ -88,8 +89,8 @@ function CreateModal({ onClose, onCreate }: { onClose: () => void; onCreate: (c:
                 type="number"
                 value={numClasses}
                 onChange={(e) => setNumClasses(e.target.value)}
-                min={2}
-                max={20}
+                min={MIN_CLASSES}
+                max={MAX_CLASSES}
                 disabled={mutation.isPending}
               />
               {errors.numClasses && <span className="form-error">{errors.numClasses}</span>}
