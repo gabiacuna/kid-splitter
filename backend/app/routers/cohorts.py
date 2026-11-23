@@ -19,7 +19,13 @@ async def _student_count(db: AsyncSession, cohort_id: str) -> int:
     ) or 0
 
 
-def _build_out(cohort: Cohort, count: int) -> CohortOut:
+async def _last_solve_at(db: AsyncSession, cohort_id: str):
+    return await db.scalar(
+        select(func.max(Solution.created_at)).where(Solution.cohort_id == cohort_id)
+    )
+
+
+def _build_out(cohort: Cohort, count: int, last_solve_at=None) -> CohortOut:
     return CohortOut(
         id=cohort.id,
         name=cohort.name,
@@ -27,6 +33,7 @@ def _build_out(cohort: Cohort, count: int) -> CohortOut:
         num_classes=cohort.num_classes,
         balance_gender=cohort.balance_gender,
         student_count=count,
+        last_solve_at=last_solve_at,
         created_at=cohort.created_at,
         updated_at=cohort.updated_at,
     )
@@ -37,15 +44,21 @@ async def list_cohorts(
     teacher: Teacher = Depends(current_teacher),
     db: AsyncSession = Depends(get_db),
 ):
+    # One query: DISTINCT because the solutions join multiplies student rows.
     stmt = (
-        select(Cohort, func.count(Student.id).label("student_count"))
+        select(
+            Cohort,
+            func.count(func.distinct(Student.id)).label("student_count"),
+            func.max(Solution.created_at).label("last_solve_at"),
+        )
         .outerjoin(Student, Student.cohort_id == Cohort.id)
+        .outerjoin(Solution, Solution.cohort_id == Cohort.id)
         .where(Cohort.teacher_id == teacher.id)
         .group_by(Cohort.id)
         .order_by(Cohort.created_at.desc())
     )
     rows = (await db.execute(stmt)).all()
-    cohorts = [_build_out(c, cnt) for c, cnt in rows]
+    cohorts = [_build_out(c, cnt, last) for c, cnt, last in rows]
     return CohortListOut(cohorts=cohorts)
 
 
@@ -74,7 +87,7 @@ async def get_cohort(
     db: AsyncSession = Depends(get_db),
 ):
     count = await _student_count(db, cohort.id)
-    return _build_out(cohort, count)
+    return _build_out(cohort, count, await _last_solve_at(db, cohort.id))
 
 
 @router.put("/{cohort_id}")
@@ -105,7 +118,7 @@ async def update_cohort(
     await db.commit()
     await db.refresh(cohort)
     count = await _student_count(db, cohort.id)
-    out = _build_out(cohort, count)
+    out = _build_out(cohort, count, await _last_solve_at(db, cohort.id))
 
     if warning:
         return {"cohort": out.model_dump(), "warning": warning}

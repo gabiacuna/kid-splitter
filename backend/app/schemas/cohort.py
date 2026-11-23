@@ -74,6 +74,7 @@ class CohortOut(BaseModel):
     num_classes:   int
     balance_gender: bool
     student_count: int
+    last_solve_at: Optional[datetime] = None
     created_at:    datetime
     updated_at:    datetime
 

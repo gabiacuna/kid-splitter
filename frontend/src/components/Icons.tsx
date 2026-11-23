@@ -12,3 +12,22 @@ export function TrashIcon({ size = 18 }: IconProps) {
     </svg>
   );
 }
+
+export function PersonIcon({ size = 20 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2}
+      strokeLinecap="round" strokeLinejoin="round" aria-hidden focusable="false">
+      <circle cx="12" cy="7.5" r="4" fill="currentColor" stroke="none" />
+      <path d="M3.5 21c.9-4.6 4.3-7.5 8.5-7.5s7.6 2.9 8.5 7.5" />
+    </svg>
+  );
+}
+
+export function PlusIcon({ size = 16 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.6}
+      strokeLinecap="round" aria-hidden focusable="false">
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  );
+}

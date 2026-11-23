@@ -131,6 +131,9 @@ All 6 router domains are scaffolded and all endpoints exist. The core happy path
 
 ## Changelog
 
+### 2026-11-23 — dashboard (design feature 06)
+1. **`CohortOut.last_solve_at`** = `MAX(solutions.created_at)`, folded into the list query (student count uses `COUNT(DISTINCT)` so the extra join can't inflate it). Fixes every cohort showing "No solves yet".
+
 ### 2026-11-23 — conflict groups (design feature 04)
 1. **`GET /cohorts/{id}/constraints/validate` returns `conflict_groups`** — each group has the exact constraint ids involved (badge number = group id), severity, and a plain-language explanation using student names. `contradictions` is kept (deprecated) for one release.
 2. **`coloring_impossible` is exact** (CP-SAT, 2s limit, permissive on timeout). Greedy colouring could reject solvable cohorts with a false 422.

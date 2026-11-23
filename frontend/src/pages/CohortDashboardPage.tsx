@@ -5,6 +5,9 @@ import api from '../lib/api';
 import type { Cohort } from '../lib/types';
 import Nav from '../components/Nav';
 import { MIN_CLASSES, MAX_CLASSES } from '../lib/classes';
+import { timeAgo } from '../lib/timeAgo';
+import { cohortTint } from '../lib/cohortTint';
+import { PersonIcon, PlusIcon } from '../components/Icons';
 
 function SkeletonCard() {
   return (
@@ -275,19 +278,17 @@ export default function CohortDashboardPage() {
     queryFn: () => api.get('/cohorts').then((r) => r.data.cohorts),
   });
 
-  function formatDate(iso: string | null | undefined) {
-    if (!iso) return null;
-    return new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
-  }
-
   return (
     <>
       <Nav />
       <div className="page-wrap">
         <div className="page-header">
-          <h1 className="page-title">Your cohorts</h1>
-          <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
-            + New cohort
+          <div>
+            <h1 className="page-title">Your cohorts</h1>
+            <p className="page-subtitle">Pick a cohort to manage students and class placements.</p>
+          </div>
+          <button className="btn btn-primary btn-icon" onClick={() => setShowCreate(true)}>
+            <PlusIcon /> New cohort
           </button>
         </div>
 
@@ -311,25 +312,40 @@ export default function CohortDashboardPage() {
 
         {cohorts && cohorts.length > 0 && (
           <div className="cohort-grid">
-            {cohorts.map((c) => (
-              <div key={c.id} className="cohort-card">
-                <div className="cohort-card-header">
-                  <div className="cohort-icon">📚</div>
-                  <div>
-                    <div className="cohort-name">{c.name}</div>
-                    {c.year && <div style={{ fontSize: 12.5, color: 'var(--text3)', marginTop: 2 }}>{c.year}</div>}
+            {cohorts.map((c) => {
+              // Status is inferred from solve history: never solved = Draft.
+              const solved = !!c.last_solve_at;
+              const tint = cohortTint(c.id);
+              return (
+                <article key={c.id} className={`cohort-card${solved ? '' : ' empty'}`}>
+                  <div className="cohort-card-top">
+                    <div className="cohort-icon" style={{ background: tint.bg, color: tint.fg }}><PersonIcon size={22} /></div>
+                    <span className={`status-pill ${solved ? 'active' : 'draft'}`}>{solved ? 'Active' : 'Draft'}</span>
+                    <CardMenu onEdit={() => setEditing(c)} onDelete={() => setDeleting(c)} />
                   </div>
-                  <CardMenu onEdit={() => setEditing(c)} onDelete={() => setDeleting(c)} />
-                </div>
-                <div className="cohort-meta">
-                  <span>{c.student_count ?? 0} students</span>
-                  <span>Last solve: {formatDate(c.last_solve_at) ?? 'No solves yet'}</span>
-                </div>
-                <Link to={`/cohorts/${c.id}`} className="btn btn-primary" style={{ textAlign: 'center', width: '100%' }}>
-                  Open
-                </Link>
-              </div>
-            ))}
+                  <div>
+                    <h2 className="cohort-name">{c.name}</h2>
+                    <div className="cohort-sub">
+                      {c.student_count ?? 0} {c.student_count === 1 ? 'student' : 'students'} · {c.num_classes} classes
+                      {c.year ? ` · ${c.year}` : ''}
+                    </div>
+                  </div>
+                  {solved ? (
+                    <div className="cohort-solved">
+                      Last solved <strong title={new Date(c.last_solve_at!).toLocaleString()}>{timeAgo(c.last_solve_at!)}</strong>
+                    </div>
+                  ) : (
+                    <div className="cohort-empty-note">
+                      <strong>No solves yet</strong>
+                      <span>Add constraints and run your first solve.</span>
+                    </div>
+                  )}
+                  <Link to={`/cohorts/${c.id}`} className={`btn ${solved ? 'btn-primary' : 'btn-secondary'} cohort-open`}>
+                    Open →
+                  </Link>
+                </article>
+              );
+            })}
           </div>
         )}
       </div>

@@ -961,3 +961,33 @@ input[type='range'] {
   .mobile-only { display: inline; }
   .hard-check { justify-content: flex-start; }
 }
+
+/* ---------- Cohort dashboard (feature 06) ---------- */
+.page-header { flex-wrap: wrap; gap: 12px; }
+.page-title { font-size: 26px; }
+.page-subtitle { font-size: 14px; color: var(--text2); margin-top: 4px; }
+.btn-icon { display: inline-flex; align-items: center; gap: 8px; }
+.cohort-grid { gap: 18px; }
+.cohort-card {
+  border-radius: 14px;
+  border: 1.5px solid transparent;
+  box-shadow: 0 2px 16px oklch(20% 0.02 85 / 0.08);
+}
+.cohort-card.empty { border: 2px dashed var(--border); box-shadow: none; }
+.cohort-card-top { display: flex; align-items: flex-start; gap: 8px; }
+.cohort-card-top .cohort-icon { margin-right: auto; font-size: 0; }
+.cohort-card-top .card-menu { margin-left: 0; }
+.status-pill { font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 20px; margin-top: 2px; }
+.status-pill.active { background: var(--sage-light); color: oklch(42% 0.09 155); }
+.status-pill.draft { background: var(--lavender-light); color: var(--lavender); }
+.cohort-card h2.cohort-name { margin: 0; }
+.cohort-sub { font-size: 13px; color: var(--text3); margin-top: 2px; }
+.cohort-solved { font-size: 12.5px; color: var(--text3); }
+.cohort-solved strong { color: var(--text2); }
+.cohort-empty-note {
+  background: var(--bg2); border-radius: 8px; padding: 10px 12px; text-align: center;
+  font-size: 12.5px; color: var(--text3); display: flex; flex-direction: column; gap: 2px;
+}
+.cohort-empty-note strong { color: var(--text2); font-size: 13px; }
+.cohort-open { width: 100%; text-align: center; margin-top: auto; }
+@media (max-width: 640px) { .cohort-grid { grid-template-columns: 1fr; } }
