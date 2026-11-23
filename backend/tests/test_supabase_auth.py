@@ -6,7 +6,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from fastapi import HTTPException
 
-from app.services.supabase_auth import login_outcome, signup_outcome
+from app.services.supabase_auth import login_outcome, resend_outcome, signup_outcome
 
 
 def raises(fn, status):
@@ -44,7 +44,17 @@ def test_login():
     raises(lambda: login_outcome(503, {}), 502)
 
 
+def test_resend():
+    resend_outcome(200, {})                                            # sent
+    resend_outcome(400, {"error_code": "email_not_found"})             # unknown email: same answer
+    resend_outcome(422, {"error_code": "email_address_invalid"})       # nothing leaked either
+    raises(lambda: resend_outcome(429, {"error_code": "over_email_send_rate_limit"}), 429)
+    raises(lambda: resend_outcome(400, {"error_code": "over_email_send_rate_limit"}), 429)
+    raises(lambda: resend_outcome(503, {}), 502)
+
+
 if __name__ == "__main__":
     test_signup()
     test_login()
+    test_resend()
     print("ok")

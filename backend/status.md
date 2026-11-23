@@ -13,6 +13,7 @@ All 6 router domains are scaffolded and all endpoints exist. The core happy path
 | POST /auth/register | ✅ Done | Supabase signup first, then local profile; 409 for existing emails |
 | POST /auth/login | ✅ Done | Supabase verifies the password; recreates a missing local profile |
 | POST /auth/refresh | ✅ Done | exchanges refresh token with Supabase and rotates both cookies |
+| POST /auth/resend-confirmation | ✅ Done | re-sends the sign-up email; same answer for any address; 5/hour per IP |
 | POST /auth/logout | ✅ Done | clears both cookies |
 | GET /auth/me | ✅ Done | |
 
@@ -130,6 +131,9 @@ All 6 router domains are scaffolded and all endpoints exist. The core happy path
 ---
 
 ## Changelog
+
+### 2026-11-23 — resend confirmation email
+1. **`POST /auth/resend-confirmation`** calls Supabase `/auth/v1/resend` (type `signup`). It answers identically for unknown, unconfirmed and already-confirmed emails (no account probing); only rate limits (429) and provider outages (502) are surfaced. Rate-limited to 5/hour per IP on top of Supabase's own per-address limit.
 
 ### 2026-11-23 — sign-up / login fix
 1. **Supabase is the only password store.** The local bcrypt hash could disagree with Supabase (e.g. after the dev DB was recreated, or re-registering an email Supabase already had), leaving accounts that could never log in. Migration `002` drops `teachers.password_hash`; `bcrypt` dependency removed.

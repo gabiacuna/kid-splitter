@@ -1,16 +1,19 @@
 import os
 import httpx
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Response
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from ..db import get_db
 from ..dependencies import current_teacher
 from ..models.teacher import Teacher
-from ..schemas.auth import RegisterRequest, LoginRequest, AuthResponse, RegisterResponse, TeacherOut
-from ..services.supabase_auth import Session, login_outcome, signup_outcome
+from ..schemas.auth import RegisterRequest, LoginRequest, ResendRequest, AuthResponse, RegisterResponse, TeacherOut
+from ..services.supabase_auth import Session, login_outcome, resend_outcome, signup_outcome
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+limiter = Limiter(key_func=get_remote_address)
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "")
@@ -78,6 +81,16 @@ async def login(body: LoginRequest, response: Response, db: AsyncSession = Depen
 
     _set_auth_cookies(response, session)
     return AuthResponse(teacher=TeacherOut.model_validate(teacher))
+
+
+@router.post("/resend-confirmation")
+@limiter.limit("5/hour")
+async def resend_confirmation(request: Request, body: ResendRequest):
+    """Re-send the sign-up confirmation email. Same answer for unknown or already-confirmed
+    emails (no account probing); Supabase also rate-limits per address."""
+    status, data = await _supabase_post("/auth/v1/resend", {"type": "signup", "email": body.email})
+    resend_outcome(status, data)
+    return {"detail": "If this email has an unconfirmed account, a new confirmation link is on its way."}
 
 
 @router.post("/refresh")

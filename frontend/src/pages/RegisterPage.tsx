@@ -3,6 +3,7 @@ import { Link, Navigate, useNavigate } from 'react-router-dom';
 import api from '../lib/api';
 import { useAuth } from '../hooks/useAuth';
 import { useT } from '../i18n';
+import ResendConfirmation from '../components/ResendConfirmation';
 
 interface FieldErrors {
   school_name?: string;
@@ -91,6 +92,8 @@ export default function RegisterPage() {
             {t('We sent a confirmation link to')} <strong>{email}</strong>.{' '}
             {t('Click it to activate your account.')}
           </p>
+          <p style={{ color: 'var(--text3)', fontSize: 13, marginTop: 18 }}>{t("Didn't get it?")}</p>
+          <ResendConfirmation email={email} />
           <p className="auth-link" style={{ marginTop: 20 }}>
             <Link to="/login">{t('Back to sign in')}</Link>
           </p>

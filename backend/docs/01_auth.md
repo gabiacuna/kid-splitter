@@ -131,6 +131,10 @@ class AuthResponse(BaseModel):
 
 > **Do not return different error messages for "user not found" vs "wrong password"** — both must return the same `401 {"detail": "Invalid credentials"}` to prevent user enumeration.
 
+### `POST /auth/resend-confirmation`
+
+Body `{email}`. Calls Supabase `POST /auth/v1/resend` with `type: "signup"`. Always `200` with a generic message — never reveal whether the email exists or is already confirmed. `429` when rate-limited (Supabase per-address limit, or 5/hour per IP here), `502` if Supabase is down.
+
 ### `POST /auth/logout`
 
 1. Require `current_teacher` dependency (validates JWT).

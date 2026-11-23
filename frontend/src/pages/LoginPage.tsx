@@ -3,6 +3,7 @@ import { Link, Navigate, useNavigate } from 'react-router-dom';
 import api from '../lib/api';
 import { useAuth } from '../hooks/useAuth';
 import { useT } from '../i18n';
+import ResendConfirmation from '../components/ResendConfirmation';
 
 export default function LoginPage() {
   const t = useT();
@@ -11,6 +12,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [unconfirmed, setUnconfirmed] = useState(false);
   const [loading, setLoading] = useState(false);
 
   if (teacher) return <Navigate to="/cohorts" replace />;
@@ -18,6 +20,7 @@ export default function LoginPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
+    setUnconfirmed(false);
     setLoading(true);
     try {
       const res = await api.post('/auth/login', { email, password });
@@ -29,6 +32,7 @@ export default function LoginPage() {
         setError(t('Incorrect email or password.'));
       } else if (status === 403) {
         setError(t('Confirm your email first — check your inbox (and spam) for the link we sent.'));
+        setUnconfirmed(true);
       } else if (status === 429) {
         setError(t('Too many attempts. Wait a few minutes and try again.'));
       } else {
@@ -72,6 +76,7 @@ export default function LoginPage() {
             />
             {error && <span className="form-error">{error}</span>}
           </div>
+          {unconfirmed && <ResendConfirmation email={email} />}
           <button className="btn btn-primary" type="submit" disabled={loading} style={{ width: '100%', marginTop: 4 }}>
             {loading ? t('Signing in…') : t('Sign in')}
           </button>

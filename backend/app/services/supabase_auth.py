@@ -63,3 +63,13 @@ def login_outcome(status: int, body: dict) -> tuple[Session, dict]:
     if status == 429:
         raise HTTPException(status_code=429, detail="Too many attempts — try again later")
     raise HTTPException(status_code=502, detail="Login failed at the auth provider")
+
+
+def resend_outcome(status: int, body: dict) -> None:
+    """Resend the sign-up confirmation email. Answers the same way whether or not the
+    email exists or is already confirmed, so the endpoint can't be used to probe accounts;
+    only rate limits (which the teacher can act on) and provider outages are surfaced."""
+    if status == 429 or "rate_limit" in _error_code(body):
+        raise HTTPException(status_code=429, detail="Please wait a minute before requesting another email")
+    if status >= 500:
+        raise HTTPException(status_code=502, detail="Could not send the email right now")
