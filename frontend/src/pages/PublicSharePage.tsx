@@ -3,8 +3,10 @@ import { useParams } from 'react-router-dom'
 import api from '../lib/api'
 import type { PublicSolutionData } from '../lib/types'
 import { classColorStyle, classLabel } from '../lib/classes';
+import { useT } from '../i18n';
 
 export default function PublicSharePage() {
+  const t = useT()
   const { token } = useParams<{ token: string }>()
   const [data, setData] = useState<PublicSolutionData | null>(null)
   const [status, setStatus] = useState<'loading' | 'loaded' | 'not_found' | 'error'>('loading')
@@ -30,7 +32,7 @@ export default function PublicSharePage() {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ textAlign: 'center', color: 'var(--text2)' }}>
-          <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>This link is no longer available.</h2>
+          <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>{t('This link is no longer available.')}</h2>
         </div>
       </div>
     )
@@ -40,7 +42,7 @@ export default function PublicSharePage() {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ textAlign: 'center', color: 'var(--text2)' }}>
-          <p>Something went wrong. Try again later.</p>
+          <p>{t('Something went wrong. Try again later.')}</p>
         </div>
       </div>
     )
@@ -53,15 +55,15 @@ export default function PublicSharePage() {
         kid splitter
       </div>
       <h1 style={{ fontSize: 24, fontWeight: 800, letterSpacing: '-0.4px', marginBottom: 4 }}>
-        {data.cohort_name} — Class Lists
+        {t('{cohort} — Class Lists', { cohort: data.cohort_name })}
       </h1>
-      <p style={{ fontSize: 13.5, color: 'var(--text3)', marginBottom: 32 }}>Shared view · Names only</p>
+      <p style={{ fontSize: 13.5, color: 'var(--text3)', marginBottom: 32 }}>{t('Shared view · Names only')}</p>
       <div className="roster-grid">
         {data.classes.map((cls) => (
           <div key={cls.class_number} className="roster-class-card" style={classColorStyle(cls.class_number)}>
             <div className="roster-class-header">
               <span>{classLabel(cls.class_number)}</span>
-              <span style={{ fontWeight: 500, opacity: 0.75 }}>{cls.students.length} students</span>
+              <span style={{ fontWeight: 500, opacity: 0.75 }}>{cls.students.length === 1 ? t('{n} student', { n: cls.students.length }) : t('{n} students', { n: cls.students.length })}</span>
             </div>
             {[...cls.students].sort((a, b) => a.first_name.localeCompare(b.first_name)).map((s, i) => (
               <div key={i} className="roster-student-row">

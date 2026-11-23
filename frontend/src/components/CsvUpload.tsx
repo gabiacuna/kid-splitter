@@ -4,13 +4,15 @@ import api from '../lib/api';
 import type { ColumnNote, ImportConfirmResponse, ImportPreviewResponse, PreferenceMatch, PreviewRow } from '../lib/types';
 import { useToast } from './Toast';
 import { genderLabel } from '../lib/gender';
+import { useT } from '../i18n';
 
 function StatusBadge({ status }: { status: PreviewRow['status'] }) {
-  if (status === 'ok') return <span className="badge badge-sage">OK</span>;
-  if (status === 'duplicate') return <span className="badge badge-warn">Duplicate</span>;
-  if (status === 'invalid_tag') return <span className="badge badge-red">Invalid tag</span>;
-  if (status === 'invalid_gender') return <span className="badge badge-warn">Gender unclear</span>;
-  return <span className="badge badge-red">Missing name</span>;
+  const t = useT();
+  if (status === 'ok') return <span className="badge badge-sage">{t('OK')}</span>;
+  if (status === 'duplicate') return <span className="badge badge-warn">{t('Duplicate')}</span>;
+  if (status === 'invalid_tag') return <span className="badge badge-red">{t('Invalid tag')}</span>;
+  if (status === 'invalid_gender') return <span className="badge badge-warn">{t('Gender unclear')}</span>;
+  return <span className="badge badge-red">{t('Missing name')}</span>;
 }
 
 function PreferenceChip({
@@ -22,6 +24,7 @@ function PreferenceChip({
   onRemove: () => void;
   onRename: (name: string) => void;
 }) {
+  const t = useT();
   const matched = pref.status === 'matched';
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(pref.name);
@@ -30,7 +33,7 @@ function PreferenceChip({
 
   if (matched) {
     return (
-      <span className="badge badge-sage" title={`Matched → ${pref.matched_display}`}>
+      <span className="badge badge-sage" title={t('Matched → {name}', { name: pref.matched_display ?? pref.name })}>
         {pref.matched_display ?? pref.name}
       </span>
     );
@@ -66,7 +69,7 @@ function PreferenceChip({
       <button
         type="button"
         className="pref-chip-text"
-        title={`Could not match "${pref.name}" — click to edit`}
+        title={t('Could not match "{name}" — click to edit', { name: pref.name })}
         onClick={() => setEditing(true)}
       >
         {pref.name} ?
@@ -74,7 +77,7 @@ function PreferenceChip({
       <button
         type="button"
         className="pref-chip-remove"
-        aria-label={`Remove ${pref.name}`}
+        aria-label={t('Remove {name}', { name: pref.name })}
         onClick={onRemove}
       >
         ×
@@ -109,7 +112,7 @@ function PreferenceCell({
 
 const isErrorRow = (r: PreviewRow) => !r.importable;
 
-const normName = (s: string) => s.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().split(/\s+/).filter(Boolean).join(' ');
+const normName = (s: string) => s.normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase().split(/\s+/).filter(Boolean).join(' ');
 
 /** One decision per distinct unmatched name, however many students listed it. */
 interface PendingName {
@@ -133,13 +136,16 @@ function PendingNamesPanel({
   onSkip: (key: string) => void;
   onSkipAll: () => void;
 }) {
+  const t = useT();
   return (
-    <section className="decision-panel" aria-label="Pairing names that need a decision">
+    <section className="decision-panel" aria-label={t('Pairing names that need a decision')}>
       <div className="decision-panel-head">
         <strong>
-          {pending.length} pairing {pending.length === 1 ? 'name needs' : 'names need'} your decision
+          {pending.length === 1
+            ? t('{n} pairing name needs your decision', { n: pending.length })
+            : t('{n} pairing names need your decision', { n: pending.length })}
         </strong>
-        <button type="button" className="link-button" onClick={onSkipAll}>Skip all</button>
+        <button type="button" className="link-button" onClick={onSkipAll}>{t('Skip all')}</button>
       </div>
       <div className="decision-list">
         {pending.map((p) => {
@@ -147,12 +153,14 @@ function PendingNamesPanel({
           return (
             <div key={p.key} className="decision-item">
               <p>
-                <strong>{p.owners.join(', ')}</strong> {p.owners.length === 1 ? 'wants' : 'want'} to be with{' '}
+                <strong>{p.owners.join(', ')}</strong> {p.owners.length === 1 ? t('wants to be with') : t('want to be with')}{' '}
                 <strong>“{p.name}”</strong>
-                {p.status === 'ambiguous' ? ', which matches more than one student.' : ', but no student has that name.'}
+                {p.status === 'ambiguous'
+                  ? t(', which matches more than one student.')
+                  : t(', but no student has that name.')}
               </p>
               <div className="decision-actions">
-                {p.suggestions.length > 0 && <span className="decision-label">Did you mean</span>}
+                {p.suggestions.length > 0 && <span className="decision-label">{t('Did you mean')}</span>}
                 {p.suggestions.map((sug) => (
                   <button key={sug} type="button" className="btn btn-secondary btn-sm" onClick={() => onPick(p.key, sug)}>
                     {sug}
@@ -163,12 +171,12 @@ function PendingNamesPanel({
                   className="btn btn-secondary btn-sm"
                   onClick={() => onAddNew(p.key)}
                   disabled={!canAdd}
-                  title={canAdd ? undefined : 'Needs a first and last name — edit the name in the table first'}
+                  title={canAdd ? undefined : t('Needs a first and last name — edit the name in the table first')}
                 >
-                  + Add “{p.name}” as a new student
+                  {t('+ Add “{name}” as a new student', { name: p.name })}
                 </button>
                 <button type="button" className="btn btn-ghost btn-sm" onClick={() => onSkip(p.key)}>
-                  Skip
+                  {t('Skip')}
                 </button>
               </div>
             </div>
@@ -180,12 +188,13 @@ function PendingNamesPanel({
 }
 
 function ColumnNotes({ notes }: { notes: ColumnNote[] }) {
+  const t = useT();
   if (notes.length === 0) return null;
   return (
     <ul className="column-notes">
       {notes.map((n) => (
         <li key={n.column}>
-          Column <strong>{n.column}</strong>: {n.action === 'tags' ? n.detail : `ignored — ${n.detail}`}
+          {t('Column')} <strong>{n.column}</strong>: {n.action === 'tags' ? n.detail : t('ignored — {detail}', { detail: n.detail })}
         </li>
       ))}
     </ul>
@@ -205,6 +214,7 @@ function PreviewModal({
   onClose: () => void;
   onSuccess: (students: number, constraints: number) => void;
 }) {
+  const t = useT();
   const [rows, setRows] = useState<PreviewRow[]>(initialRows);
   const qc = useQueryClient();
   const { showToast } = useToast();
@@ -230,7 +240,7 @@ function PreviewModal({
       qc.invalidateQueries({ queryKey: ['constraints', cohortId] });
       onSuccess(data.students.length, data.constraints_created);
     },
-    onError: () => showToast('Import failed. Try again.', 'error'),
+    onError: () => showToast(t('Import failed. Try again.'), 'error'),
   });
 
   const hasErrors = rows.some(isErrorRow);
@@ -333,20 +343,24 @@ function PreviewModal({
   return (
     <div className="modal-overlay">
       <div className="modal" style={{ maxWidth: 920, width: '100%', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
-        <h2 className="modal-title">Preview import</h2>
+        <h2 className="modal-title">{t('Preview import')}</h2>
         <p style={{ fontSize: 13.5, color: 'var(--text2)', marginBottom: 16 }}>
-          Review the students below before confirming. You can edit names and tags inline.
-          {hasPreferences && ' Pairing preferences become soft "keep together" constraints.'}
+          {t('Review the students below before confirming. You can edit names and tags inline.')}
+          {hasPreferences && ` ${t('Pairing preferences become soft "keep together" constraints.')}`}
         </p>
         {hasErrors && (
           <div className="warn-banner" style={{ marginBottom: 12 }}>
-            Rows marked "Missing name" or "Invalid tag" will be skipped.
+            {t('Rows marked "Missing name" or "Invalid tag" will be skipped.')}
           </div>
         )}
         {unclearGenderCount > 0 && (
           <div className="warn-banner" style={{ marginBottom: 12 }}>
-            {unclearGenderCount} {unclearGenderCount === 1 ? 'row has' : 'rows have'} a gender value we didn’t recognise.
-            {' '}{unclearGenderCount === 1 ? 'It' : 'They'} will be imported with gender unknown — set it in the student table afterwards.
+            {unclearGenderCount === 1
+              ? t('{n} row has a gender value we didn’t recognise.', { n: unclearGenderCount })
+              : t('{n} rows have a gender value we didn’t recognise.', { n: unclearGenderCount })}
+            {' '}{unclearGenderCount === 1
+              ? t('It will be imported with gender unknown — set it in the student table afterwards.')
+              : t('They will be imported with gender unknown — set it in the student table afterwards.')}
           </div>
         )}
         <ColumnNotes notes={columnNotes} />
@@ -363,12 +377,12 @@ function PreviewModal({
           <table>
             <thead>
               <tr>
-                <th>First name</th>
-                <th>Last name</th>
-                {hasGender && <th>Gender</th>}
-                <th>Tags</th>
-                {hasPreferences && <th>Pair with</th>}
-                <th>Status</th>
+                <th>{t('First name')}</th>
+                <th>{t('Last name')}</th>
+                {hasGender && <th>{t('Gender')}</th>}
+                <th>{t('Tags')}</th>
+                {hasPreferences && <th>{t('Pair with')}</th>}
+                <th>{t('Status')}</th>
               </tr>
             </thead>
             <tbody>
@@ -412,23 +426,27 @@ function PreviewModal({
           </table>
         </div>
         {validCount === 0 && (
-          <div style={{ color: 'var(--text3)', fontSize: 13, marginTop: 10 }}>No valid students to import.</div>
+          <div style={{ color: 'var(--text3)', fontSize: 13, marginTop: 10 }}>{t('No valid students to import.')}</div>
         )}
         <div className="modal-footer">
           <button className="btn btn-secondary" onClick={onClose} disabled={confirmMutation.isPending}>
-            Cancel
+            {t('Cancel')}
           </button>
           <button
             className="btn btn-primary"
             onClick={() => confirmMutation.mutate()}
             disabled={validCount === 0 || unresolvedCount > 0 || confirmMutation.isPending}
-            title={unresolvedCount > 0 ? 'Decide what to do with the unmatched pairing names first' : undefined}
+            title={unresolvedCount > 0 ? t('Decide what to do with the unmatched pairing names first') : undefined}
           >
             {confirmMutation.isPending
-              ? 'Importing…'
+              ? t('Importing…')
               : unresolvedCount > 0
-                ? `Decide ${unresolvedCount} ${unresolvedCount === 1 ? 'name' : 'names'} first`
-                : `Confirm import (${validCount} students)`}
+                ? (unresolvedCount === 1
+                    ? t('Decide {n} name first', { n: unresolvedCount })
+                    : t('Decide {n} names first', { n: unresolvedCount }))
+                : (validCount === 1
+                    ? t('Confirm import ({n} student)', { n: validCount })
+                    : t('Confirm import ({n} students)', { n: validCount }))}
           </button>
         </div>
       </div>
@@ -437,15 +455,33 @@ function PreviewModal({
 }
 
 export default function CsvUploadButton({ cohortId }: { cohortId: string }) {
+  const t = useT();
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState<ImportPreviewResponse | null>(null);
   const [uploadError, setUploadError] = useState('');
   const { showToast } = useToast();
 
+  /** Summary toast after a successful import; each count needs its own sentence for Spanish plurals. */
+  function importSummary(students: number, constraints: number): string {
+    if (constraints === 0) {
+      return students === 1
+        ? t('{n} student added.', { n: students })
+        : t('{n} students added.', { n: students });
+    }
+    if (students === 1) {
+      return constraints === 1
+        ? t('{s} student added, {c} "keep together" preference created.', { s: students, c: constraints })
+        : t('{s} student added, {c} "keep together" preferences created.', { s: students, c: constraints });
+    }
+    return constraints === 1
+      ? t('{s} students added, {c} "keep together" preference created.', { s: students, c: constraints })
+      : t('{s} students added, {c} "keep together" preferences created.', { s: students, c: constraints });
+  }
+
   async function handleFile(file: File) {
     if (file.size > 5 * 1024 * 1024) {
-      setUploadError('File too large. Maximum 5 MB.');
+      setUploadError(t('File too large. Maximum 5 MB.'));
       return;
     }
     setUploadError('');
@@ -460,9 +496,9 @@ export default function CsvUploadButton({ cohortId }: { cohortId: string }) {
     } catch (err: unknown) {
       const status = (err as { response?: { status: number } }).response?.status;
       if (status === 422) {
-        setUploadError('Too many rows. Maximum 500 students per import.');
+        setUploadError(t('Too many rows. Maximum 500 students per import.'));
       } else {
-        setUploadError('Import failed. Check your file format and try again.');
+        setUploadError(t('Import failed. Check your file format and try again.'));
       }
     } finally {
       setUploading(false);
@@ -478,7 +514,7 @@ export default function CsvUploadButton({ cohortId }: { cohortId: string }) {
           onClick={() => inputRef.current?.click()}
           disabled={uploading}
         >
-          {uploading ? 'Uploading…' : 'Import CSV'}
+          {uploading ? t('Uploading…') : t('Import CSV')}
         </button>
         {uploadError && <span className="form-error" style={{ fontSize: 12 }}>{uploadError}</span>}
         <input
@@ -498,10 +534,7 @@ export default function CsvUploadButton({ cohortId }: { cohortId: string }) {
           onClose={() => setPreview(null)}
           onSuccess={(students, constraints) => {
             setPreview(null);
-            const msg = constraints > 0
-              ? `${students} students added, ${constraints} "keep together" preferences created.`
-              : `${students} students added.`;
-            showToast(msg, 'success');
+            showToast(importSummary(students, constraints), 'success');
           }}
         />
       )}

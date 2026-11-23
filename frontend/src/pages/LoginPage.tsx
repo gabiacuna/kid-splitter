@@ -2,8 +2,10 @@ import { useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import api from '../lib/api';
 import { useAuth } from '../hooks/useAuth';
+import { useT } from '../i18n';
 
 export default function LoginPage() {
+  const t = useT();
   const { teacher, setTeacher } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
@@ -24,9 +26,9 @@ export default function LoginPage() {
     } catch (err: unknown) {
       const status = (err as { response?: { status: number } }).response?.status;
       if (status === 401) {
-        setError('Incorrect email or password.');
+        setError(t('Incorrect email or password.'));
       } else {
-        setError('Something went wrong. Try again.');
+        setError(t('Something went wrong. Try again.'));
       }
     } finally {
       setLoading(false);
@@ -40,22 +42,22 @@ export default function LoginPage() {
           <span className="nav-logo-icon material-symbols-outlined">groups_3</span>
           kid splitter
         </div>
-        <h1 className="auth-title">Welcome back</h1>
-        <p className="auth-subtitle">Sign in to your account</p>
+        <h1 className="auth-title">{t('Welcome back')}</h1>
+        <p className="auth-subtitle">{t('Sign in to your account')}</p>
         <form className="auth-form" onSubmit={handleSubmit}>
           <div className="form-field">
-            <label className="form-label">Email</label>
+            <label className="form-label">{t('Email')}</label>
             <input
               type="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               disabled={loading}
-              placeholder="you@school.edu"
+              placeholder={t('you@school.edu')}
             />
           </div>
           <div className="form-field">
-            <label className="form-label">Password</label>
+            <label className="form-label">{t('Password')}</label>
             <input
               type="password"
               required
@@ -67,11 +69,11 @@ export default function LoginPage() {
             {error && <span className="form-error">{error}</span>}
           </div>
           <button className="btn btn-primary" type="submit" disabled={loading} style={{ width: '100%', marginTop: 4 }}>
-            {loading ? 'Signing in…' : 'Sign in'}
+            {loading ? t('Signing in…') : t('Sign in')}
           </button>
         </form>
         <p className="auth-link">
-          Don't have an account? <Link to="/register">Sign up</Link>
+          {t('Don\'t have an account?')} <Link to="/register">{t('Sign up')}</Link>
         </p>
       </div>
     </div>

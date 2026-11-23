@@ -6,6 +6,7 @@ import { useToast } from '../components/Toast';
 import { TrashIcon } from '../components/Icons';
 import { validationKey } from '../lib/queryKeys';
 import { shortNames } from '../lib/roster';
+import { useT } from '../i18n';
 
 /*
  * Constraint editor (design features 04 + 05).
@@ -62,6 +63,7 @@ function useRowAutosave<T>(
   onError: (msg: string) => void,
 ) {
   const tracker = useContext(SaveTrackerContext);
+  const t = useT();
   const idRef = useRef(initialId);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latest = useRef<T | null>(null);
@@ -82,11 +84,11 @@ function useRowAutosave<T>(
         tracker.end(true);
       } catch (e) {
         const detail = (e as { response?: { data?: { detail?: unknown } } }).response?.data?.detail;
-        onError(typeof detail === 'string' ? detail : 'Couldn’t save this rule. Check it and try again.');
+        onError(typeof detail === 'string' ? detail : t('Couldn’t save this rule. Check it and try again.'));
         tracker.end(false);
       }
     });
-  }, [isComplete, onError, tracker]);
+  }, [isComplete, onError, tracker, t]);
 
   const schedule = useCallback((value: T) => {
     latest.current = value;
@@ -113,9 +115,10 @@ function useRowAutosave<T>(
 function StudentSelect({ value, onChange, students, exclude, label }: {
   value: string; onChange: (v: string) => void; students: Student[]; exclude?: string; label: string;
 }) {
+  const t = useT();
   return (
     <select value={value} onChange={(e) => onChange(e.target.value)} aria-label={label}>
-      <option value="">Select student…</option>
+      <option value="">{t('Select student…')}</option>
       {students.filter((s) => s.id !== exclude).map((s) => (
         <option key={s.id} value={s.id}>{s.first_name} {s.last_name}</option>
       ))}
@@ -124,12 +127,13 @@ function StudentSelect({ value, onChange, students, exclude, label }: {
 }
 
 function WeightSlider({ value, onChange, disabled }: { value: number; onChange: (v: number) => void; disabled?: boolean }) {
+  const t = useT();
   const v = Math.round(Math.min(10, Math.max(1, value)));
   return (
-    <div className={`weight-slider-wrap${disabled ? ' is-disabled' : ''}`} title={disabled ? 'Hard rules always apply — weight is ignored' : undefined}>
+    <div className={`weight-slider-wrap${disabled ? ' is-disabled' : ''}`} title={disabled ? t('Hard rules always apply — weight is ignored') : undefined}>
       <input
         type="range" min={1} max={10} step={1} value={v} disabled={disabled}
-        aria-label="Weight (1–10)"
+        aria-label={t('Weight (1–10)')}
         onChange={(e) => onChange(parseInt(e.target.value))}
       />
       <span className="weight-value" aria-hidden>{v}</span>
@@ -138,27 +142,29 @@ function WeightSlider({ value, onChange, disabled }: { value: number; onChange: 
 }
 
 function HardCheckbox({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+  const t = useT();
   return (
     <label className="hard-check">
-      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} aria-label="Hard rule (must always hold)" />
-      <span className="mobile-only">Hard</span>
+      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} aria-label={t('Hard rule (must always hold)')} />
+      <span className="mobile-only">{t('Hard')}</span>
     </label>
   );
 }
 
 function DeleteControl({ onDelete, busy }: { onDelete: () => void; busy: boolean }) {
   const [confirm, setConfirm] = useState(false);
+  const t = useT();
   if (confirm) {
     return (
       <div className="delete-confirm">
-        <span>Remove?</span>
-        <button type="button" className="btn btn-danger btn-sm" onClick={onDelete} disabled={busy}>Yes</button>
-        <button type="button" className="btn btn-secondary btn-sm" onClick={() => setConfirm(false)}>No</button>
+        <span>{t('Remove?')}</span>
+        <button type="button" className="btn btn-danger btn-sm" onClick={onDelete} disabled={busy}>{t('Yes')}</button>
+        <button type="button" className="btn btn-secondary btn-sm" onClick={() => setConfirm(false)}>{t('No')}</button>
       </div>
     );
   }
   return (
-    <button type="button" className="icon-button danger" aria-label="Delete rule" title="Delete rule" onClick={() => setConfirm(true)}>
+    <button type="button" className="icon-button danger" aria-label={t('Delete rule')} title={t('Delete rule')} onClick={() => setConfirm(true)}>
       <TrashIcon />
     </button>
   );
@@ -195,6 +201,7 @@ function useConstraintRow<T extends { id?: string }>(
   const qc = useQueryClient();
   const { showToast } = useToast();
   const tracker = useContext(SaveTrackerContext);
+  const t = useT();
 
   const persist = useCallback(async (v: T, id?: string) => {
     const res = id
@@ -221,7 +228,7 @@ function useConstraintRow<T extends { id?: string }>(
       onRemoved();
       tracker.end(true);
     } catch {
-      showToast('Failed to delete. Try again.', 'error');
+      showToast(t('Failed to delete. Try again.'), 'error');
       setDeleting(false);
       tracker.end(false);
     }
@@ -239,53 +246,54 @@ const BinaryRow = memo(function BinaryRow({ rowKey, draft, students, cohortId, b
   RowProps<BinaryDraft> & { badgeId?: number; badgeSeverity?: 'hard' | 'soft' }) {
   const { c, update, error, deleting, handleDelete, incomplete } =
     useConstraintRow('binary', draft, cohortId, isBinaryComplete, binaryBody, () => onRemoved(rowKey));
+  const t = useT();
   return (
     <div className={`constraint-row binary${badgeId ? ` conflict conflict-${badgeSeverity}` : ''}${incomplete ? ' incomplete' : ''}`}>
-      {badgeId && <span className="conflict-badge" aria-label={`Conflict ${badgeId}`}>{badgeId}</span>}
-      <StudentSelect label="Student A" value={c.student_a_id} onChange={(v) => update({ student_a_id: v })} students={students} exclude={c.student_b_id} />
-      <StudentSelect label="Student B" value={c.student_b_id} onChange={(v) => update({ student_b_id: v })} students={students} exclude={c.student_a_id} />
+      {badgeId && <span className="conflict-badge" aria-label={t('Conflict {n}', { n: badgeId })}>{badgeId}</span>}
+      <StudentSelect label={t('Student A')} value={c.student_a_id} onChange={(v) => update({ student_a_id: v })} students={students} exclude={c.student_b_id} />
+      <StudentSelect label={t('Student B')} value={c.student_b_id} onChange={(v) => update({ student_b_id: v })} students={students} exclude={c.student_a_id} />
       <select
-        className={`type-select ${c.type}`} value={c.type} aria-label="Type"
+        className={`type-select ${c.type}`} value={c.type} aria-label={t('Type')}
         onChange={(e) => update({ type: e.target.value as BinaryConstraint['type'] })}
       >
-        <option value="together">Together</option>
-        <option value="separate">Separate</option>
+        <option value="together">{t('Together')}</option>
+        <option value="separate">{t('Separate')}</option>
       </select>
       <HardCheckbox checked={c.is_hard} onChange={(v) => update({ is_hard: v })} />
       <WeightSlider value={c.weight} onChange={(v) => update({ weight: v })} disabled={c.is_hard} />
       <DeleteControl onDelete={handleDelete} busy={deleting} />
-      {incomplete && <span className="row-hint">Choose both students — the rule saves once it’s complete.</span>}
+      {incomplete && <span className="row-hint">{t('Choose both students — the rule saves once it’s complete.')}</span>}
       {error && <span className="form-error row-hint">{error}</span>}
     </div>
   );
 });
 
-const UNARY_LABELS: Record<UnaryConstraint['type'], string> = {
-  small_class: 'Prefers a smaller class',
-  large_class: 'Prefers a larger class',
-  max_flagged_peers: 'Limit classmates with tag',
-  max_conflict_peers: 'Limit conflict-tagged classmates',
-};
-
 const UnaryRow = memo(function UnaryRow({ rowKey, draft, students, cohortId, onRemoved }: RowProps<UnaryDraft>) {
   const { c, update, error, deleting, handleDelete, incomplete } =
     useConstraintRow('unary', draft, cohortId, isUnaryComplete, unaryBody, () => onRemoved(rowKey));
   const needsParam = needsTagParam(c.type);
+  const t = useT();
+  const UNARY_LABELS: Record<UnaryConstraint['type'], string> = {
+    small_class: t('Prefers a smaller class'),
+    large_class: t('Prefers a larger class'),
+    max_flagged_peers: t('Limit classmates with tag'),
+    max_conflict_peers: t('Limit conflict-tagged classmates'),
+  };
   return (
     <div className={`constraint-row unary${incomplete ? ' incomplete' : ''}`}>
-      <StudentSelect label="Student" value={c.student_id} onChange={(v) => update({ student_id: v })} students={students} />
-      <select value={c.type} aria-label="Rule" onChange={(e) => update({ type: e.target.value as UnaryConstraint['type'] })}>
+      <StudentSelect label={t('Student')} value={c.student_id} onChange={(v) => update({ student_id: v })} students={students} />
+      <select value={c.type} aria-label={t('Rule')} onChange={(e) => update({ type: e.target.value as UnaryConstraint['type'] })}>
         {Object.entries(UNARY_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
       </select>
       {needsParam ? (
         <div className="unary-params">
           <input
-            type="text" placeholder="tag" aria-label="Tag" value={c.tag ?? ''} maxLength={30}
+            type="text" placeholder={t('tag')} aria-label={t('Tag')} value={c.tag ?? ''} maxLength={30}
             onChange={(e) => update({ tag: e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, '') })}
           />
-          <span>max</span>
+          <span>{t('max')}</span>
           <input
-            type="number" min={0} aria-label="Maximum in class" value={c.parameter ?? ''}
+            type="number" min={0} aria-label={t('Maximum in class')} value={c.parameter ?? ''}
             onChange={(e) => update({ parameter: e.target.value === '' ? null : Math.max(0, parseInt(e.target.value) || 0) })}
           />
         </div>
@@ -293,7 +301,7 @@ const UnaryRow = memo(function UnaryRow({ rowKey, draft, students, cohortId, onR
       <HardCheckbox checked={c.is_hard} onChange={(v) => update({ is_hard: v })} />
       <WeightSlider value={c.weight} onChange={(v) => update({ weight: v })} disabled={c.is_hard} />
       <DeleteControl onDelete={handleDelete} busy={deleting} />
-      {incomplete && <span className="row-hint">{needsParam ? 'Choose a student, a tag and a maximum — it saves once complete.' : 'Choose a student — it saves once complete.'}</span>}
+      {incomplete && <span className="row-hint">{needsParam ? t('Choose a student, a tag and a maximum — it saves once complete.') : t('Choose a student — it saves once complete.')}</span>}
       {error && <span className="form-error row-hint">{error}</span>}
     </div>
   );
@@ -310,9 +318,14 @@ function ConflictBanner({ groups, binary, students }: { groups: ConflictGroup[];
   const byId = new Map(binary.map((b) => [b.id, b]));
   const short = useMemo(() => shortNames(students), [students]);
   const name = (id: string) => short.get(id) ?? '?';
+  const t = useT();
   const title = hard.length > 0
-    ? `${hard.length} contradiction${hard.length > 1 ? 's' : ''} found — resolve before solving.`
-    : `${soft.length} preference conflict${soft.length > 1 ? 's' : ''} — the solver will have to break some preferences.`;
+    ? (hard.length === 1
+      ? t('{n} contradiction found — resolve before solving.', { n: hard.length })
+      : t('{n} contradictions found — resolve before solving.', { n: hard.length }))
+    : (soft.length === 1
+      ? t('{n} preference conflict — the solver will have to break some preferences.', { n: soft.length })
+      : t('{n} preference conflicts — the solver will have to break some preferences.', { n: soft.length }));
 
   return (
     <div className={`conflict-banner${hard.length ? '' : ' soft'}`} role="status">
@@ -320,7 +333,7 @@ function ConflictBanner({ groups, binary, students }: { groups: ConflictGroup[];
         <span aria-hidden>⚠</span>
         <span className="conflict-banner-title">{title}</span>
         <button type="button" className="conflict-why" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
-          {open ? 'Hide' : 'Why?'}
+          {open ? t('Hide') : t('Why?')}
         </button>
       </div>
       {open && (
@@ -334,11 +347,11 @@ function ConflictBanner({ groups, binary, students }: { groups: ConflictGroup[];
                   {rules.slice(0, MAX_CHIPS).map((r) => (
                     <span key={r.id} className="conflict-chip">
                       <span className={`conflict-num ${g.severity}`}>{g.id}</span>
-                      {name(r.student_a_id)} + {name(r.student_b_id)} — {r.type === 'together' ? 'Together' : 'Separate'}
-                      {r.is_hard ? ' (hard)' : ''}
+                      {name(r.student_a_id)} + {name(r.student_b_id)} — {r.type === 'together' ? t('Together') : t('Separate')}
+                      {r.is_hard ? ` ${t('(hard)')}` : ''}
                     </span>
                   ))}
-                  {rules.length > MAX_CHIPS && <span className="conflict-chip more">+{rules.length - MAX_CHIPS} more</span>}
+                  {rules.length > MAX_CHIPS && <span className="conflict-chip more">{t('+{n} more', { n: rules.length - MAX_CHIPS })}</span>}
                 </div>
               </div>
             );
@@ -358,6 +371,7 @@ const newKey = () => `new-${++_tempKey}`;
 
 export default function ConstraintEditorTab({ cohortId }: { cohortId: string }) {
   const qc = useQueryClient();
+  const t = useT();
 
   const { data: constraintData, isLoading } = useQuery<{ binary: BinaryConstraint[]; unary: UnaryConstraint[] }>({
     queryKey: ['constraints', cohortId],
@@ -427,14 +441,16 @@ export default function ConstraintEditorTab({ cohortId }: { cohortId: string }) 
   return (
     <SaveTrackerContext.Provider value={tracker}>
       <div className="constraint-editor">
-        {noStudents && <div className="warn-banner" style={{ marginBottom: 20 }}>Add students before creating constraints.</div>}
+        {noStudents && <div className="warn-banner" style={{ marginBottom: 20 }}>{t('Add students before creating constraints.')}</div>}
 
         <div className="constraint-toolbar">
-          <span className="constraint-count">{binaryRows.length} {binaryRows.length === 1 ? 'rule' : 'rules'}</span>
+          <span className="constraint-count">
+            {binaryRows.length === 1 ? t('{n} rule', { n: binaryRows.length }) : t('{n} rules', { n: binaryRows.length })}
+          </span>
           <span className={`save-status ${saveState}`} aria-live="polite">
-            {saveState === 'saving' && 'Saving…'}
-            {saveState === 'saved' && 'All changes saved'}
-            {saveState === 'error' && 'Some changes couldn’t be saved'}
+            {saveState === 'saving' && t('Saving…')}
+            {saveState === 'saved' && t('All changes saved')}
+            {saveState === 'error' && t('Some changes couldn’t be saved')}
           </span>
         </div>
 
@@ -442,7 +458,7 @@ export default function ConstraintEditorTab({ cohortId }: { cohortId: string }) 
 
         {binaryRows.length > 0 && (
           <div className="constraint-header" aria-hidden>
-            <span>Student A</span><span>Student B</span><span>Type</span><span>Hard</span><span>Weight</span><span />
+            <span>{t('Student A')}</span><span>{t('Student B')}</span><span>{t('Type')}</span><span>{t('Hard')}</span><span>{t('Weight')}</span><span />
           </div>
         )}
         {binaryRows.map((r) => {
@@ -461,12 +477,16 @@ export default function ConstraintEditorTab({ cohortId }: { cohortId: string }) 
           );
         })}
         <button type="button" className="add-constraint" onClick={addBinary} disabled={noStudents}>
-          + Add constraint
+          {t('+ Add constraint')}
         </button>
 
         <details className="advanced-constraints" open={advancedOpen} onToggle={(e) => setAdvancedOpen(e.currentTarget.open)}>
-          <summary>Advanced: class-size and tag limits{unaryCount > 0 ? ` (${unaryCount})` : ''}</summary>
-          <p className="advanced-hint">Rules about a single student — e.g. a smaller class, or at most N classmates with a given tag.</p>
+          <summary>
+            {unaryCount > 0
+              ? t('Advanced: class-size and tag limits ({n})', { n: unaryCount })
+              : t('Advanced: class-size and tag limits')}
+          </summary>
+          <p className="advanced-hint">{t('Rules about a single student — e.g. a smaller class, or at most N classmates with a given tag.')}</p>
           {unaryRows.map((r) => (
             <UnaryRow
               key={r.key}
@@ -478,7 +498,7 @@ export default function ConstraintEditorTab({ cohortId }: { cohortId: string }) 
             />
           ))}
           <button type="button" className="add-constraint" onClick={addUnary} disabled={noStudents}>
-            + Add advanced rule
+            {t('+ Add advanced rule')}
           </button>
         </details>
       </div>

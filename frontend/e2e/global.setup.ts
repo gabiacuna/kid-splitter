@@ -13,6 +13,8 @@ setup('log in and seed solved cohorts', async ({ page }) => {
   await page.fill('input[type="password"]', password);
   await page.click('button[type="submit"]');
   await page.waitForURL((u) => !u.pathname.startsWith('/login'));
+  // The app defaults to Spanish; the suite's selectors are English, so pin the saved session to English.
+  await page.evaluate(() => localStorage.setItem('lang', 'en'));
   mkdirSync(path.dirname(AUTH_STATE), { recursive: true });
   await page.context().storageState({ path: AUTH_STATE });
 

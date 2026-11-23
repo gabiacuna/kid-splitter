@@ -9,6 +9,7 @@ import CohortDashboardPage from './pages/CohortDashboardPage'
 import CohortDetailPage from './pages/CohortDetailPage'
 import SolutionDetailPage from './pages/SolutionDetailPage'
 import PublicSharePage from './pages/PublicSharePage'
+import { LanguageProvider } from './i18n'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -22,16 +23,18 @@ export default function App() {
       <BrowserRouter>
         <AuthProvider>
           <ToastProvider>
-            <Routes>
-              <Route path="/" element={<Navigate to="/cohorts" replace />} />
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="/register" element={<RegisterPage />} />
-              <Route path="/cohorts" element={<ProtectedRoute><CohortDashboardPage /></ProtectedRoute>} />
-              <Route path="/cohorts/:id" element={<ProtectedRoute><CohortDetailPage /></ProtectedRoute>} />
-              <Route path="/solutions/:id" element={<ProtectedRoute><SolutionDetailPage /></ProtectedRoute>} />
-              <Route path="/share/:token" element={<PublicSharePage />} />
-              <Route path="*" element={<Navigate to="/cohorts" replace />} />
-            </Routes>
+            <LanguageProvider>
+              <Routes>
+                <Route path="/" element={<Navigate to="/cohorts" replace />} />
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="/register" element={<RegisterPage />} />
+                <Route path="/cohorts" element={<ProtectedRoute><CohortDashboardPage /></ProtectedRoute>} />
+                <Route path="/cohorts/:id" element={<ProtectedRoute><CohortDetailPage /></ProtectedRoute>} />
+                <Route path="/solutions/:id" element={<ProtectedRoute><SolutionDetailPage /></ProtectedRoute>} />
+                <Route path="/share/:token" element={<PublicSharePage />} />
+                <Route path="*" element={<Navigate to="/cohorts" replace />} />
+              </Routes>
+            </LanguageProvider>
           </ToastProvider>
         </AuthProvider>
       </BrowserRouter>

@@ -8,6 +8,7 @@ import { MIN_CLASSES, MAX_CLASSES } from '../lib/classes';
 import { timeAgo } from '../lib/timeAgo';
 import { cohortTint } from '../lib/cohortTint';
 import { PersonIcon, PlusIcon } from '../components/Icons';
+import { useT, getLocale } from '../i18n';
 
 function SkeletonCard() {
   return (
@@ -21,6 +22,7 @@ function SkeletonCard() {
 }
 
 function CreateModal({ onClose, onCreate }: { onClose: () => void; onCreate: (c: Cohort) => void }) {
+  const t = useT();
   const [name, setName] = useState('');
   const [year, setYear] = useState('');
   const [numClasses, setNumClasses] = useState('3');
@@ -35,14 +37,14 @@ function CreateModal({ onClose, onCreate }: { onClose: () => void; onCreate: (c:
       qc.invalidateQueries({ queryKey: ['cohorts'] });
       onCreate(data);
     },
-    onError: () => setServerError('Something went wrong. Try again.'),
+    onError: () => setServerError(t('Something went wrong. Try again.')),
   });
 
   function validate() {
     const errs: Record<string, string> = {};
-    if (!name.trim()) errs.name = 'Name is required.';
+    if (!name.trim()) errs.name = t('Name is required.');
     const n = parseInt(numClasses);
-    if (!numClasses || n < MIN_CLASSES || n > MAX_CLASSES) errs.numClasses = `Between ${MIN_CLASSES} and ${MAX_CLASSES} classes.`;
+    if (!numClasses || n < MIN_CLASSES || n > MAX_CLASSES) errs.numClasses = t('Between {min} and {max} classes.', { min: MIN_CLASSES, max: MAX_CLASSES });
     return errs;
   }
 
@@ -57,26 +59,26 @@ function CreateModal({ onClose, onCreate }: { onClose: () => void; onCreate: (c:
   return (
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal">
-        <h2 className="modal-title">New cohort</h2>
+        <h2 className="modal-title">{t('New cohort')}</h2>
         <p style={{ fontSize: 13.5, color: 'var(--text2)', marginBottom: 20 }}>
-          Create a new class group to start adding students.
+          {t('Create a new class group to start adding students.')}
         </p>
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div className="form-field">
-            <label className="form-label">Cohort name *</label>
+            <label className="form-label">{t('Cohort name *')}</label>
             <input
               type="text"
               maxLength={100}
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Year 3 — 2026"
+              placeholder={t('Year 3 — 2026')}
               disabled={mutation.isPending}
             />
             {errors.name && <span className="form-error">{errors.name}</span>}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div className="form-field">
-              <label className="form-label">Year (optional)</label>
+              <label className="form-label">{t('Year (optional)')}</label>
               <input
                 type="number"
                 value={year}
@@ -88,7 +90,7 @@ function CreateModal({ onClose, onCreate }: { onClose: () => void; onCreate: (c:
               />
             </div>
             <div className="form-field">
-              <label className="form-label">Number of classes *</label>
+              <label className="form-label">{t('Number of classes *')}</label>
               <input
                 type="number"
                 value={numClasses}
@@ -108,17 +110,17 @@ function CreateModal({ onClose, onCreate }: { onClose: () => void; onCreate: (c:
               disabled={mutation.isPending}
             />
             <span>
-              Prioritize a balanced mix of boys and girls per class
-              <span className="checkbox-caption">Added as a soft constraint the solver weighs alongside your other preferences.</span>
+              {t('Prioritize a balanced mix of boys and girls per class')}
+              <span className="checkbox-caption">{t('Added as a soft constraint the solver weighs alongside your other preferences.')}</span>
             </span>
           </label>
           {serverError && <span className="form-error">{serverError}</span>}
           <div className="modal-footer">
             <button type="button" className="btn btn-secondary" onClick={onClose} disabled={mutation.isPending}>
-              Cancel
+              {t('Cancel')}
             </button>
             <button type="submit" className="btn btn-primary" disabled={mutation.isPending}>
-              {mutation.isPending ? 'Creating…' : 'Create cohort'}
+              {mutation.isPending ? t('Creating…') : t('Create cohort')}
             </button>
           </div>
         </form>
@@ -128,6 +130,7 @@ function CreateModal({ onClose, onCreate }: { onClose: () => void; onCreate: (c:
 }
 
 function EditModal({ cohort, onClose }: { cohort: Cohort; onClose: () => void }) {
+  const t = useT();
   const [name, setName] = useState(cohort.name);
   const [balanceGender, setBalanceGender] = useState(cohort.balance_gender);
   const [error, setError] = useState('');
@@ -141,12 +144,12 @@ function EditModal({ cohort, onClose }: { cohort: Cohort; onClose: () => void })
       qc.invalidateQueries({ queryKey: ['cohort', cohort.id] });
       onClose();
     },
-    onError: () => setServerError('Something went wrong. Try again.'),
+    onError: () => setServerError(t('Something went wrong. Try again.')),
   });
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!name.trim()) { setError('Name is required.'); return; }
+    if (!name.trim()) { setError(t('Name is required.')); return; }
     setServerError('');
     mutation.mutate({ name: name.trim(), balance_gender: balanceGender });
   }
@@ -154,10 +157,10 @@ function EditModal({ cohort, onClose }: { cohort: Cohort; onClose: () => void })
   return (
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal">
-        <h2 className="modal-title">Edit cohort</h2>
+        <h2 className="modal-title">{t('Edit cohort')}</h2>
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div className="form-field">
-            <label className="form-label">Cohort name *</label>
+            <label className="form-label">{t('Cohort name *')}</label>
             <input
               type="text"
               maxLength={100}
@@ -176,17 +179,17 @@ function EditModal({ cohort, onClose }: { cohort: Cohort; onClose: () => void })
               disabled={mutation.isPending}
             />
             <span>
-              Prioritize a balanced mix of boys and girls per class
-              <span className="checkbox-caption">Added as a soft constraint the solver weighs alongside your other preferences.</span>
+              {t('Prioritize a balanced mix of boys and girls per class')}
+              <span className="checkbox-caption">{t('Added as a soft constraint the solver weighs alongside your other preferences.')}</span>
             </span>
           </label>
           {serverError && <span className="form-error">{serverError}</span>}
           <div className="modal-footer">
             <button type="button" className="btn btn-secondary" onClick={onClose} disabled={mutation.isPending}>
-              Cancel
+              {t('Cancel')}
             </button>
             <button type="submit" className="btn btn-primary" disabled={mutation.isPending}>
-              {mutation.isPending ? 'Saving…' : 'Save'}
+              {mutation.isPending ? t('Saving…') : t('Save')}
             </button>
           </div>
         </form>
@@ -196,6 +199,9 @@ function EditModal({ cohort, onClose }: { cohort: Cohort; onClose: () => void })
 }
 
 function DeleteModal({ cohort, onClose }: { cohort: Cohort; onClose: () => void }) {
+  const t = useT();
+  // Split the translated sentence around {name} so the name can stay bold ("¿Eliminar <b>X</b>?").
+  const [deletePrefix, deleteSuffix = ''] = t('Delete {name}?').split('{name}');
   const [serverError, setServerError] = useState('');
   const qc = useQueryClient();
 
@@ -205,24 +211,23 @@ function DeleteModal({ cohort, onClose }: { cohort: Cohort; onClose: () => void 
       qc.invalidateQueries({ queryKey: ['cohorts'] });
       onClose();
     },
-    onError: () => setServerError('Something went wrong. Try again.'),
+    onError: () => setServerError(t('Something went wrong. Try again.')),
   });
 
   return (
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal">
-        <h2 className="modal-title">Delete cohort</h2>
+        <h2 className="modal-title">{t('Delete cohort')}</h2>
         <p style={{ fontSize: 13.5, color: 'var(--text2)', marginBottom: 20 }}>
-          Delete <strong>{cohort.name}</strong>? This permanently removes its students,
-          constraints, and solutions. This can’t be undone.
+          {deletePrefix}<strong>{cohort.name}</strong>{deleteSuffix} {t('This permanently removes its students, constraints, and solutions. This can’t be undone.')}
         </p>
         {serverError && <span className="form-error">{serverError}</span>}
         <div className="modal-footer">
           <button type="button" className="btn btn-secondary" onClick={onClose} disabled={mutation.isPending}>
-            Cancel
+            {t('Cancel')}
           </button>
           <button type="button" className="btn btn-danger" onClick={() => mutation.mutate()} disabled={mutation.isPending}>
-            {mutation.isPending ? 'Deleting…' : 'Delete'}
+            {mutation.isPending ? t('Deleting…') : t('Delete')}
           </button>
         </div>
       </div>
@@ -231,6 +236,7 @@ function DeleteModal({ cohort, onClose }: { cohort: Cohort; onClose: () => void 
 }
 
 function CardMenu({ onEdit, onDelete }: { onEdit: () => void; onDelete: () => void }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -248,7 +254,7 @@ function CardMenu({ onEdit, onDelete }: { onEdit: () => void; onDelete: () => vo
       <button
         type="button"
         className="card-menu-btn"
-        aria-label="Cohort options"
+        aria-label={t('Cohort options')}
         onClick={() => setOpen((o) => !o)}
       >
         ⋯
@@ -256,10 +262,10 @@ function CardMenu({ onEdit, onDelete }: { onEdit: () => void; onDelete: () => vo
       {open && (
         <div className="card-menu-dropdown">
           <button type="button" className="card-menu-item" onClick={() => { setOpen(false); onEdit(); }}>
-            Edit
+            {t('Edit')}
           </button>
           <button type="button" className="card-menu-item danger" onClick={() => { setOpen(false); onDelete(); }}>
-            Delete
+            {t('Delete')}
           </button>
         </div>
       )}
@@ -268,6 +274,7 @@ function CardMenu({ onEdit, onDelete }: { onEdit: () => void; onDelete: () => vo
 }
 
 export default function CohortDashboardPage() {
+  const t = useT();
   const navigate = useNavigate();
   const [showCreate, setShowCreate] = useState(false);
   const [editing, setEditing] = useState<Cohort | null>(null);
@@ -284,11 +291,11 @@ export default function CohortDashboardPage() {
       <div className="page-wrap">
         <div className="page-header">
           <div>
-            <h1 className="page-title">Your cohorts</h1>
-            <p className="page-subtitle">Pick a cohort to manage students and class placements.</p>
+            <h1 className="page-title">{t('Your cohorts')}</h1>
+            <p className="page-subtitle">{t('Pick a cohort to manage students and class placements.')}</p>
           </div>
           <button className="btn btn-primary btn-icon" onClick={() => setShowCreate(true)}>
-            <PlusIcon /> New cohort
+            <PlusIcon /> {t('New cohort')}
           </button>
         </div>
 
@@ -299,14 +306,14 @@ export default function CohortDashboardPage() {
         )}
 
         {isError && (
-          <div className="warn-banner">Failed to load cohorts. Refresh to try again.</div>
+          <div className="warn-banner">{t('Failed to load cohorts. Refresh to try again.')}</div>
         )}
 
         {cohorts && cohorts.length === 0 && (
           <div className="empty-state">
-            <h3>No cohorts yet</h3>
-            <p>Create your first cohort to start building class lists.</p>
-            <button className="btn btn-primary" onClick={() => setShowCreate(true)}>New cohort</button>
+            <h3>{t('No cohorts yet')}</h3>
+            <p>{t('Create your first cohort to start building class lists.')}</p>
+            <button className="btn btn-primary" onClick={() => setShowCreate(true)}>{t('New cohort')}</button>
           </div>
         )}
 
@@ -316,32 +323,33 @@ export default function CohortDashboardPage() {
               // Status is inferred from solve history: never solved = Draft.
               const solved = !!c.last_solve_at;
               const tint = cohortTint(c.id);
+              const studentCount = c.student_count ?? 0;
               return (
                 <article key={c.id} className={`cohort-card${solved ? '' : ' empty'}`}>
                   <div className="cohort-card-top">
                     <div className="cohort-icon" style={{ background: tint.bg, color: tint.fg }}><PersonIcon size={22} /></div>
-                    <span className={`status-pill ${solved ? 'active' : 'draft'}`}>{solved ? 'Active' : 'Draft'}</span>
+                    <span className={`status-pill ${solved ? 'active' : 'draft'}`}>{solved ? t('Active') : t('Draft')}</span>
                     <CardMenu onEdit={() => setEditing(c)} onDelete={() => setDeleting(c)} />
                   </div>
                   <div>
                     <h2 className="cohort-name">{c.name}</h2>
                     <div className="cohort-sub">
-                      {c.student_count ?? 0} {c.student_count === 1 ? 'student' : 'students'} · {c.num_classes} classes
+                      {studentCount === 1 ? t('{n} student', { n: studentCount }) : t('{n} students', { n: studentCount })} · {c.num_classes === 1 ? t('{n} class', { n: c.num_classes }) : t('{n} classes', { n: c.num_classes })}
                       {c.year ? ` · ${c.year}` : ''}
                     </div>
                   </div>
                   {solved ? (
                     <div className="cohort-solved">
-                      Last solved <strong title={new Date(c.last_solve_at!).toLocaleString()}>{timeAgo(c.last_solve_at!)}</strong>
+                      {t('Last solved')} <strong title={new Date(c.last_solve_at!).toLocaleString(getLocale())}>{timeAgo(c.last_solve_at!)}</strong>
                     </div>
                   ) : (
                     <div className="cohort-empty-note">
-                      <strong>No solves yet</strong>
-                      <span>Add constraints and run your first solve.</span>
+                      <strong>{t('No solves yet')}</strong>
+                      <span>{t('Add constraints and run your first solve.')}</span>
                     </div>
                   )}
                   <Link to={`/cohorts/${c.id}`} className={`btn ${solved ? 'btn-primary' : 'btn-secondary'} cohort-open`}>
-                    Open →
+                    {t('Open')} →
                   </Link>
                 </article>
               );

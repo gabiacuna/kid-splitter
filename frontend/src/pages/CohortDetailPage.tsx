@@ -8,10 +8,12 @@ import StudentListTab from './StudentListTab';
 import ConstraintEditorTab from './ConstraintEditorTab';
 import SolutionsTab from './SolutionsTab';
 import { useToast } from '../components/Toast';
+import { useT } from '../i18n';
 
 type Tab = 'students' | 'constraints' | 'solutions';
 
 function InlineEdit({ value, onSave, type = 'text', placeholder }: { value: string; onSave: (v: string) => Promise<void>; type?: string; placeholder?: string }) {
+  const t = useT();
   const [editing, setEditing] = useState(false);
   const [val, setVal] = useState(value);
   const [saving, setSaving] = useState(false);
@@ -32,9 +34,9 @@ function InlineEdit({ value, onSave, type = 'text', placeholder }: { value: stri
       <span
         className="inline-edit-display"
         onClick={() => { setVal(value); setEditing(true); }}
-        title="Click to edit"
+        title={t('Click to edit')}
       >
-        {value || <span style={{ color: 'var(--text3)' }}>{placeholder ?? 'Click to edit'}</span>}
+        {value || <span style={{ color: 'var(--text3)' }}>{placeholder ?? t('Click to edit')}</span>}
         {saving && <span className="spinner" style={{ width: 12, height: 12, borderWidth: 2, marginLeft: 6 }} />}
       </span>
     );
@@ -57,6 +59,7 @@ function InlineEdit({ value, onSave, type = 'text', placeholder }: { value: stri
 }
 
 function DeleteModal({ cohort, onClose }: { cohort: Cohort; onClose: () => void }) {
+  const t = useT();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [error, setError] = useState('');
@@ -67,21 +70,21 @@ function DeleteModal({ cohort, onClose }: { cohort: Cohort; onClose: () => void 
       qc.invalidateQueries({ queryKey: ['cohorts'] });
       navigate('/cohorts');
     },
-    onError: () => setError('Failed to delete cohort. Try again.'),
+    onError: () => setError(t('Failed to delete cohort. Try again.')),
   });
 
   return (
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal">
-        <h2 className="modal-title">Delete {cohort.name}?</h2>
+        <h2 className="modal-title">{t('Delete {name}?', { name: cohort.name })}</h2>
         <p style={{ fontSize: 13.5, color: 'var(--text2)', marginTop: 8 }}>
-          This will permanently remove all students, constraints, and solutions. This cannot be undone.
+          {t('This will permanently remove all students, constraints, and solutions. This cannot be undone.')}
         </p>
         {error && <p className="form-error" style={{ marginTop: 12 }}>{error}</p>}
         <div className="modal-footer">
-          <button className="btn btn-secondary" onClick={onClose} disabled={mutation.isPending}>Cancel</button>
+          <button className="btn btn-secondary" onClick={onClose} disabled={mutation.isPending}>{t('Cancel')}</button>
           <button className="btn btn-danger" onClick={() => mutation.mutate()} disabled={mutation.isPending}>
-            {mutation.isPending ? 'Deleting…' : 'Delete cohort'}
+            {mutation.isPending ? t('Deleting…') : t('Delete cohort')}
           </button>
         </div>
       </div>
@@ -90,6 +93,7 @@ function DeleteModal({ cohort, onClose }: { cohort: Cohort; onClose: () => void 
 }
 
 export default function CohortDetailPage() {
+  const t = useT();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -133,7 +137,7 @@ export default function CohortDetailPage() {
       qc.setQueryData(['cohort', id], updated);
       qc.invalidateQueries({ queryKey: ['cohorts'] });
     } catch {
-      showToast('Failed to save. Try again.', 'error');
+      showToast(t('Failed to save. Try again.'), 'error');
     }
   }
 
@@ -143,9 +147,17 @@ export default function CohortDetailPage() {
       const updated = await api.put(`/cohorts/${id}`, { year }).then((r) => r.data);
       qc.setQueryData(['cohort', id], updated);
     } catch {
-      showToast('Failed to save. Try again.', 'error');
+      showToast(t('Failed to save. Try again.'), 'error');
     }
   }
+
+  const tabLabels: Record<Tab, string> = {
+    students: t('Students'),
+    constraints: t('Constraints'),
+    solutions: t('Solutions'),
+  };
+  const n = students.length;
+  const numClasses = cohort.num_classes;
 
   return (
     <>
@@ -157,19 +169,21 @@ export default function CohortDetailPage() {
               <InlineEdit value={cohort.name} onSave={saveName} />
             </h1>
             <div style={{ fontSize: 13, color: 'var(--text3)', display: 'flex', gap: 16 }}>
-              <span>Year: <InlineEdit value={cohort.year?.toString() ?? ''} onSave={saveYear} type="number" placeholder="add year" /></span>
-              <span>{students.length} students · {cohort.num_classes} classes</span>
+              <span>{t('Year:')} <InlineEdit value={cohort.year?.toString() ?? ''} onSave={saveYear} type="number" placeholder={t('add year')} /></span>
+              <span>
+                {n === 1 ? t('{n} student', { n }) : t('{n} students', { n })} · {numClasses === 1 ? t('{n} class', { n: numClasses }) : t('{n} classes', { n: numClasses })}
+              </span>
             </div>
           </div>
           <button className="btn btn-danger" style={{ fontSize: 13 }} onClick={() => setShowDelete(true)}>
-            Delete cohort
+            {t('Delete cohort')}
           </button>
         </div>
 
         <div className="tabs">
-          {(['students', 'constraints', 'solutions'] as Tab[]).map((t) => (
-            <button key={t} className={`tab-btn${tab === t ? ' active' : ''}`} onClick={() => setTab(t)}>
-              {t.charAt(0).toUpperCase() + t.slice(1)}
+          {(['students', 'constraints', 'solutions'] as Tab[]).map((key) => (
+            <button key={key} className={`tab-btn${tab === key ? ' active' : ''}`} onClick={() => setTab(key)}>
+              {tabLabels[key]}
             </button>
           ))}
         </div>

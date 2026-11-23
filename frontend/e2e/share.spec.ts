@@ -10,8 +10,10 @@ test('share: public page renders names only, revoke hides it', async ({ page, ap
   expect(pub).not.toHaveProperty('score');
   expect(JSON.stringify(pub)).not.toContain('last_name');
 
-  // Anonymous visitor (fresh context, no cookies).
-  const anon = await browser.newPage({ storageState: { cookies: [], origins: [] } });
+  // Anonymous visitor (fresh context, no cookies; English pinned so the selectors below match).
+  const anon = await browser.newPage({
+    storageState: { cookies: [], origins: [{ origin: APP_URL, localStorage: [{ name: 'lang', value: 'en' }] }] },
+  });
   await anon.goto(`${APP_URL}/share/${share_token}`);
   await expect(anon.getByText('Class Lists')).toBeVisible();
   await expect(anon.locator('.roster-class-card')).toHaveCount(3);

@@ -6,9 +6,10 @@ import type { Solution, GenderSplit, ValidationResult } from '../lib/types';
 import { validationKey } from '../lib/queryKeys';
 import { useToast } from '../components/Toast';
 import { MIN_CLASSES, MAX_CLASSES, classColor, classLabel } from '../lib/classes';
-import { VARIANTS, variantName, rankSolutions } from '../lib/solutions';
+import { VARIANTS, variantName, variantSubtitle, rankSolutions } from '../lib/solutions';
 import { ACCENTS } from '../lib/cohortTint';
 import RosterModal from '../components/RosterModal';
+import { useT, translate, getLocale } from '../i18n';
 
 // Score accent by rank (not threshold), so three 90+ scores still read as ranked.
 const RANK_ACCENTS = ACCENTS.slice(0, 3);
@@ -21,17 +22,18 @@ function distributionSummary(total: number, n: number) {
   if (!n || n < 2) return '';
   const base = Math.floor(total / n);
   const rem = total % n;
-  if (rem === 0) return `${n} classes (${base} students each)`;
+  if (rem === 0) return translate('{n} classes ({base} students each)', { n, base });
   const sizes = [...Array(rem).fill(base + 1), ...Array(n - rem).fill(base)];
-  return `${n} classes (${sizes.join(' / ')})`;
+  return translate('{n} classes ({sizes})', { n, sizes: sizes.join(' / ') });
 }
 
 function ClassSizeBars({ solution }: { solution: Solution }) {
+  const t = useT();
   const sizes = classSizes(solution);
   const max = Math.max(...sizes, 1);
   return (
-    <section className="bar-section" aria-label="Class sizes">
-      <h4 className="caps-label">Class sizes</h4>
+    <section className="bar-section" aria-label={t('Class sizes')}>
+      <h4 className="caps-label">{t('Class sizes')}</h4>
       {sizes.map((size, i) => (
         <div key={i} className="hbar-row">
           <span className="hbar-label">{classLabel(i + 1)}</span>
@@ -46,22 +48,27 @@ function ClassSizeBars({ solution }: { solution: Solution }) {
 }
 
 function GenderBars({ split }: { split: GenderSplit[] }) {
+  const t = useT();
   return (
-    <section className="bar-section" aria-label="Boy / girl balance">
-      <h4 className="caps-label">Boy / girl balance</h4>
+    <section className="bar-section" aria-label={t('Boy / girl balance')}>
+      <h4 className="caps-label">{t('Boy / girl balance')}</h4>
       {split.map((c) => {
         const total = c.boys + c.girls + c.unknown || 1;
         return (
           <div key={c.class_number} className="hbar-row">
             <span className="hbar-label">{classLabel(c.class_number)}</span>
             <div className="hbar-track segmented" role="img"
-              aria-label={`${c.boys} boys, ${c.girls} girls${c.unknown ? `, ${c.unknown} unknown` : ''}`}>
+              aria-label={c.unknown
+                ? t('{boys} boys, {girls} girls, {unknown} unknown', { boys: c.boys, girls: c.girls, unknown: c.unknown })
+                : t('{boys} boys, {girls} girls', { boys: c.boys, girls: c.girls })}>
               {c.boys > 0 && <div className="seg boys" style={{ width: `${(c.boys / total) * 100}%` }} />}
               {c.girls > 0 && <div className="seg girls" style={{ width: `${(c.girls / total) * 100}%` }} />}
               {c.unknown > 0 && <div className="seg unknown" style={{ width: `${(c.unknown / total) * 100}%` }} />}
             </div>
             <span className="hbar-value small">
-              {c.boys}B / {c.girls}G{c.unknown ? ` / ${c.unknown}?` : ''}
+              {c.unknown
+                ? t('{boys}B / {girls}G / {unknown}?', { boys: c.boys, girls: c.girls, unknown: c.unknown })
+                : t('{boys}B / {girls}G', { boys: c.boys, girls: c.girls })}
             </span>
           </div>
         );
@@ -73,46 +80,47 @@ function GenderBars({ split }: { split: GenderSplit[] }) {
 function SolutionCard({ solution, rank, showGender, onDelete }: {
   solution: Solution; rank: number; showGender: boolean; onDelete: () => void;
 }) {
+  const t = useT();
   const best = rank === 0;
   const accent = RANK_ACCENTS[Math.min(rank, RANK_ACCENTS.length - 1)];
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [showRoster, setShowRoster] = useState(false);
   return (
     <article className={`solution-card${best ? ' best' : ''}${solution.hard_violations > 0 ? ' has-violations' : ''}`}>
-      {best && <div className="solution-best-badge">✦ BEST</div>}
+      {best && <div className="solution-best-badge">✦ {t('BEST')}</div>}
       <div>
         <h3 className="solution-name">{variantName(solution.label)}</h3>
-        {VARIANTS[solution.label] && <p className="solution-subtitle">{VARIANTS[solution.label].subtitle}</p>}
+        {VARIANTS[solution.label] && <p className="solution-subtitle">{variantSubtitle(solution.label)}</p>}
       </div>
       <div className="solution-score-row">
         <span className="solution-score" style={{ color: accent.fg }}>{Math.round(solution.score)}</span>
-        <span className="solution-score-unit">/ 100 score</span>
+        <span className="solution-score-unit">{t('/ 100 score')}</span>
       </div>
       <div className="stat-chips">
         <div className="stat-chip" style={{ background: accent.bg, color: accent.fg }}>
-          <span>Soft violations</span><strong>{solution.soft_violations}</strong>
+          <span>{t('Soft violations')}</span><strong>{solution.soft_violations}</strong>
         </div>
         <div className={`stat-chip${solution.hard_violations ? ' danger' : ' neutral'}`}>
-          <span>Hard violations</span><strong>{solution.hard_violations}</strong>
+          <span>{t('Hard violations')}</span><strong>{solution.hard_violations}</strong>
         </div>
       </div>
       {solution.solver_metadata?.status === 'FEASIBLE' && (
-        <span className="badge badge-warn" title="The solver hit its time limit; a slightly better split may exist.">Not proven optimal</span>
+        <span className="badge badge-warn" title={t('The solver hit its time limit; a slightly better split may exist.')}>{t('Not proven optimal')}</span>
       )}
       <ClassSizeBars solution={solution} />
       {showGender && <GenderBars split={solution.gender_split} />}
       <div className="solution-actions">
         <button type="button" className={`btn ${best ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setShowRoster(true)}>
-          View class lists
+          {t('View class lists')}
         </button>
         {confirmDelete ? (
           <span className="solution-delete-confirm">
-            Delete this option?{' '}
-            <button type="button" className="link-button danger" onClick={onDelete}>Delete</button>{' '}
-            <button type="button" className="link-button" onClick={() => setConfirmDelete(false)}>Cancel</button>
+            {t('Delete this option?')}{' '}
+            <button type="button" className="link-button danger" onClick={onDelete}>{t('Delete')}</button>{' '}
+            <button type="button" className="link-button" onClick={() => setConfirmDelete(false)}>{t('Cancel')}</button>
           </span>
         ) : (
-          <button type="button" className="link-button muted" onClick={() => setConfirmDelete(true)}>Delete</button>
+          <button type="button" className="link-button muted" onClick={() => setConfirmDelete(true)}>{t('Delete')}</button>
         )}
       </div>
       {showRoster && <RosterModal solution={solution} onClose={() => setShowRoster(false)} />}
@@ -121,10 +129,11 @@ function SolutionCard({ solution, rank, showGender, onDelete }: {
 }
 
 function SolutionRun({ solutions, onDelete }: { solutions: Solution[]; onDelete: (id: string) => void }) {
+  const t = useT();
   const ranked = rankSolutions(solutions);
   const first = ranked[0];
   const totals = first.gender_split.reduce(
-    (t, c) => ({ boys: t.boys + c.boys, girls: t.girls + c.girls, unknown: t.unknown + c.unknown }),
+    (acc, c) => ({ boys: acc.boys + c.boys, girls: acc.girls + c.girls, unknown: acc.unknown + c.unknown }),
     { boys: 0, girls: 0, unknown: 0 },
   );
   const students = totals.boys + totals.girls + totals.unknown;
@@ -139,15 +148,15 @@ function SolutionRun({ solutions, onDelete }: { solutions: Solution[]; onDelete:
       </div>
       {showGender && (
         <div className="gender-legend" aria-hidden>
-          <span><i className="swatch boys" />Boys</span>
-          <span><i className="swatch girls" />Girls</span>
-          {totals.unknown > 0 && <span><i className="swatch unknown" />Not set</span>}
+          <span><i className="swatch boys" />{t('Boys')}</span>
+          <span><i className="swatch girls" />{t('Girls')}</span>
+          {totals.unknown > 0 && <span><i className="swatch unknown" />{t('Not set')}</span>}
         </div>
       )}
       {showGender && totals.unknown > 0 && (
         <p className="gender-disclosure">
-          {totals.unknown} of {students} students have no gender set, so the balance bars only cover the rest.{' '}
-          <Link to="?tab=students">Set it in the Students tab</Link>
+          {t('{unknown} of {students} students have no gender set, so the balance bars only cover the rest.', { unknown: totals.unknown, students })}{' '}
+          <Link to="?tab=students">{t('Set it in the Students tab')}</Link>
         </p>
       )}
     </>
@@ -155,6 +164,7 @@ function SolutionRun({ solutions, onDelete }: { solutions: Solution[]; onDelete:
 }
 
 function SolvePanel({ cohortId, hasContradictions, totalStudents, onSolved }: { cohortId: string; hasContradictions: boolean; totalStudents: number; onSolved: () => void }) {
+  const t = useT();
   const [mode, setMode] = useState<'num_classes' | 'target_size'>('num_classes');
   const [numClasses, setNumClasses] = useState('3');
   const [targetSize, setTargetSize] = useState('15');
@@ -167,11 +177,11 @@ function SolvePanel({ cohortId, hasContradictions, totalStudents, onSolved }: { 
     : Math.ceil(totalStudents / (parseInt(targetSize) || 1));
 
   let disabledReason = '';
-  if (hasContradictions) disabledReason = 'Resolve constraint contradictions before solving.';
-  else if (totalStudents === 0) disabledReason = 'Add students before solving.';
-  else if (!resolvedNum || resolvedNum < MIN_CLASSES) disabledReason = `Minimum ${MIN_CLASSES} classes.`;
-  else if (resolvedNum > MAX_CLASSES) disabledReason = `Maximum ${MAX_CLASSES} classes — raise the target class size.`;
-  else if (resolvedNum >= totalStudents) disabledReason = `Number of classes cannot exceed number of students (${totalStudents}).`;
+  if (hasContradictions) disabledReason = t('Resolve constraint contradictions before solving.');
+  else if (totalStudents === 0) disabledReason = t('Add students before solving.');
+  else if (!resolvedNum || resolvedNum < MIN_CLASSES) disabledReason = t('Minimum {min} classes.', { min: MIN_CLASSES });
+  else if (resolvedNum > MAX_CLASSES) disabledReason = t('Maximum {max} classes — raise the target class size.', { max: MAX_CLASSES });
+  else if (resolvedNum >= totalStudents) disabledReason = t('Number of classes cannot exceed number of students ({total}).', { total: totalStudents });
 
   async function handleSolve() {
     setIsSolving(true);
@@ -184,9 +194,9 @@ function SolvePanel({ cohortId, hasContradictions, totalStudents, onSolved }: { 
     } catch (err: unknown) {
       const status = (err as { response?: { status: number; data?: { detail?: string } } }).response?.status;
       if (status === 409) {
-        setSolveError('No valid arrangement exists with these constraints. Check for conflicting hard constraints.');
+        setSolveError(t('No valid arrangement exists with these constraints. Check for conflicting hard constraints.'));
       } else {
-        setSolveError('Solve failed. Try again.');
+        setSolveError(t('Solve failed. Try again.'));
       }
     } finally {
       clearInterval(timer);
@@ -196,33 +206,36 @@ function SolvePanel({ cohortId, hasContradictions, totalStudents, onSolved }: { 
 
   return (
     <div className="card" style={{ marginBottom: 24 }}>
-      <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>Generate class lists</h3>
+      <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>{t('Generate class lists')}</h3>
       <div className="dist-toggle" style={{ marginBottom: 16 }}>
         <button className={`dist-toggle-opt${mode === 'num_classes' ? ' active' : ''}`} onClick={() => setMode('num_classes')}>
-          Number of classes
+          {t('Number of classes')}
         </button>
         <button className={`dist-toggle-opt${mode === 'target_size' ? ' active' : ''}`} onClick={() => setMode('target_size')}>
-          Target class size
+          {t('Target class size')}
         </button>
       </div>
 
       {mode === 'num_classes' ? (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-          <span style={{ fontSize: 13.5 }}>Split into</span>
+          <span style={{ fontSize: 13.5 }}>{t('Split into')}</span>
           <input type="number" min={MIN_CLASSES} max={MAX_CLASSES} value={numClasses} onChange={(e) => setNumClasses(e.target.value)} style={{ width: 70 }} />
-          <span style={{ fontSize: 13.5 }}>classes</span>
+          <span style={{ fontSize: 13.5 }}>{t('classes')}</span>
         </div>
       ) : (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-          <span style={{ fontSize: 13.5 }}>Target</span>
+          <span style={{ fontSize: 13.5 }}>{t('Target')}</span>
           <input type="number" min={2} max={200} value={targetSize} onChange={(e) => setTargetSize(e.target.value)} style={{ width: 70 }} />
-          <span style={{ fontSize: 13.5 }}>students per class → <strong>{resolvedNum} classes</strong></span>
+          <span style={{ fontSize: 13.5 }}>
+            {t('students per class →')}{' '}
+            <strong>{resolvedNum === 1 ? t('{n} class', { n: resolvedNum }) : t('{n} classes', { n: resolvedNum })}</strong>
+          </span>
         </div>
       )}
 
       {totalStudents > 0 && resolvedNum >= MIN_CLASSES && resolvedNum <= MAX_CLASSES && resolvedNum < totalStudents && (
         <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 14 }}>
-          → {totalStudents} students will be split into {distributionSummary(totalStudents, resolvedNum)}
+          {t('→ {total} students will be split into {summary}', { total: totalStudents, summary: distributionSummary(totalStudents, resolvedNum) })}
         </p>
       )}
 
@@ -239,16 +252,17 @@ function SolvePanel({ cohortId, hasContradictions, totalStudents, onSolved }: { 
         disabled={!!disabledReason || solving}
         style={{ minWidth: 180 }}
       >
-        {solving ? `Solving… (${elapsed}s)` : 'Generate class lists'}
+        {solving ? t('Solving… ({s} s)', { s: elapsed }) : t('Generate class lists')}
       </button>
       {solving && elapsed > 8 && (
-        <p style={{ fontSize: 12.5, color: 'var(--text3)', marginTop: 8 }}>Taking longer than expected…</p>
+        <p style={{ fontSize: 12.5, color: 'var(--text3)', marginTop: 8 }}>{t('Taking longer than expected…')}</p>
       )}
     </div>
   );
 }
 
 export default function SolutionsTab({ cohortId, numStudents }: { cohortId: string; numStudents: number }) {
+  const t = useT();
   const qc = useQueryClient();
   const { showToast } = useToast();
 
@@ -269,7 +283,7 @@ export default function SolutionsTab({ cohortId, numStudents }: { cohortId: stri
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/solutions/${id}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['solutions', cohortId] }),
-    onError: () => showToast('Failed to delete solution.', 'error'),
+    onError: () => showToast(t('Failed to delete solution.'), 'error'),
   });
 
   if (isLoading) return <div><div className="spinner" /></div>;
@@ -284,7 +298,7 @@ export default function SolutionsTab({ cohortId, numStudents }: { cohortId: stri
   }
   const [latest, ...earlier] = runs;
   const remove = (id: string) => deleteMutation.mutate(id);
-  const when = (run: Solution[]) => new Date(run[0].created_at).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  const when = (run: Solution[]) => new Date(run[0].created_at).toLocaleString(getLocale(), { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
   return (
     <div>
@@ -297,28 +311,30 @@ export default function SolutionsTab({ cohortId, numStudents }: { cohortId: stri
 
       {!latest && (
         <div className="empty-state">
-          <h3>No class lists yet</h3>
-          <p>Use the form above to generate class arrangement options.</p>
+          <h3>{t('No class lists yet')}</h3>
+          <p>{t('Use the form above to generate class arrangement options.')}</p>
         </div>
       )}
 
       {latest && (
         <>
           <p className="solutions-intro">
-            Here are {latest.length} ways to split your students. Pick the one that feels right for your class.
-            <span className="solutions-when"> Generated {when(latest)}.</span>
+            {latest.length === 1
+              ? t('Here is {n} way to split your students. Pick the one that feels right for your class.', { n: latest.length })
+              : t('Here are {n} ways to split your students. Pick the one that feels right for your class.', { n: latest.length })}
+            <span className="solutions-when"> {t('Generated {when}.', { when: when(latest) })}</span>
           </p>
           <SolutionRun solutions={latest} onDelete={remove} />
-          <p className="solutions-caption">On a small screen? Cards stack so you can compare one at a time.</p>
+          <p className="solutions-caption">{t('On a small screen? Cards stack so you can compare one at a time.')}</p>
         </>
       )}
 
       {earlier.length > 0 && (
         <details className="earlier-runs">
-          <summary>Earlier runs ({earlier.length})</summary>
+          <summary>{t('Earlier runs ({n})', { n: earlier.length })}</summary>
           {earlier.map((run) => (
             <div key={run[0].id} className="earlier-run">
-              <h4>Generated {when(run)}</h4>
+              <h4>{t('Generated {when}', { when: when(run) })}</h4>
               <SolutionRun solutions={run} onDelete={remove} />
             </div>
           ))}

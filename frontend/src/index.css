@@ -187,6 +187,28 @@ input:focus, select:focus, textarea:focus {
   font-weight: 500;
   color: var(--text2);
 }
+.lang-toggle {
+  display: inline-flex;
+  border: 1.5px solid var(--border);
+  border-radius: 999px;
+  padding: 2px;
+}
+.lang-toggle-btn {
+  background: none;
+  border: none;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text3);
+  cursor: pointer;
+}
+.lang-toggle-btn.active {
+  background: var(--teal-light);
+  color: var(--teal-dark);
+}
 
 /* Card */
 .card {

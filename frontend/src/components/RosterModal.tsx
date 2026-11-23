@@ -8,6 +8,7 @@ import { variantName } from '../lib/solutions';
 import { groupByClass, togetherPairs } from '../lib/roster';
 import { layoutMap, MAP_H, MAP_W } from '../lib/preferenceMap';
 import { CollapseIcon, ExpandIcon, SheetIcon } from './Icons';
+import { useT } from '../i18n';
 
 const FOCUSABLE = 'a[href], button:not([disabled]), input, select, textarea, [tabindex]:not([tabindex="-1"])';
 
@@ -19,6 +20,7 @@ function PreferenceMap({ classes, pairs, names }: {
   pairs: [string, string][];
   names: Map<string, string>;
 }) {
+  const t = useT();
   const layout = useMemo(
     () => layoutMap(classes.map((c) => ({ classNumber: c.classNumber, ids: c.members.map((m) => m.studentId) }))),
     [classes],
@@ -28,7 +30,11 @@ function PreferenceMap({ classes, pairs, names }: {
   return (
     <div>
       <div className="pref-map" role="img"
-        aria-label={`Preference map: ${layout.nodes.length} students in ${classes.length} classes, ${pairs.length} together ${pairs.length === 1 ? 'preference' : 'preferences'} drawn as lines. The class table lists the same assignments.`}>
+        aria-label={t('Preference map: {students} in {classes}, {prefs} drawn as lines. The class table lists the same assignments.', {
+          students: layout.nodes.length === 1 ? t('{n} student', { n: layout.nodes.length }) : t('{n} students', { n: layout.nodes.length }),
+          classes: classes.length === 1 ? t('{n} class', { n: classes.length }) : t('{n} classes', { n: classes.length }),
+          prefs: pairs.length === 1 ? t('{n} together preference', { n: pairs.length }) : t('{n} together preferences', { n: pairs.length }),
+        })}>
         <svg viewBox={`0 0 ${MAP_W} ${MAP_H}`} aria-hidden>
           {layout.clusters.map((c) => (
             <circle key={c.classNumber} cx={c.x} cy={c.y} r={c.radius + 6} fill={classColor(c.classNumber)} opacity={0.08} />
@@ -58,7 +64,7 @@ function PreferenceMap({ classes, pairs, names }: {
         {classes.map((c) => (
           <span key={c.classNumber}><i style={{ background: classColor(c.classNumber) }} />{classLabel(c.classNumber)}</span>
         ))}
-        <span className="pref-legend-note">— lines show paired preferences ({pairs.length})</span>
+        <span className="pref-legend-note">{t('— lines show paired preferences ({n})', { n: pairs.length })}</span>
       </div>
     </div>
   );
@@ -72,6 +78,7 @@ function downloadName(header: string | undefined, fallback: string) {
 }
 
 function ExportButton({ solutionId }: { solutionId: string }) {
+  const t = useT();
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
 
@@ -83,7 +90,7 @@ function ExportButton({ solutionId }: { solutionId: string }) {
       const url = URL.createObjectURL(res.data);
       const a = document.createElement('a');
       a.href = url;
-      a.download = downloadName(res.headers['content-disposition'], 'class-list.xlsx');
+      a.download = downloadName(res.headers['content-disposition'], t('class-list.xlsx'));
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -97,9 +104,9 @@ function ExportButton({ solutionId }: { solutionId: string }) {
 
   return (
     <div className="export-wrap">
-      {failed && <span className="export-error" role="alert">Download failed — try again</span>}
+      {failed && <span className="export-error" role="alert">{t('Download failed — try again')}</span>}
       <button type="button" className="export-btn" onClick={download} disabled={busy}>
-        <SheetIcon />{busy ? 'Preparing…' : 'Download .xlsx'}
+        <SheetIcon />{busy ? t('Preparing…') : t('Download .xlsx')}
       </button>
     </div>
   );
@@ -107,6 +114,7 @@ function ExportButton({ solutionId }: { solutionId: string }) {
 
 export default function RosterModal({ solution, onClose }: { solution: Solution; onClose: () => void }) {
   const [expanded, setExpanded] = useState(false);
+  const t = useT();
   const dialogRef = useRef<HTMLDivElement>(null);
   const titleId = `roster-title-${solution.id}`;
   const cohortId = solution.cohort_id;
@@ -153,18 +161,18 @@ export default function RosterModal({ solution, onClose }: { solution: Solution;
       <div ref={dialogRef} className={`modal roster-modal${expanded ? ' expanded' : ''}`}
         role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} onKeyDown={onKeyDown}>
         <div className="roster-modal-header">
-          <h2 id={titleId} className="roster-modal-title">{variantName(solution.label)} — class lists</h2>
+          <h2 id={titleId} className="roster-modal-title">{t('{name} — class lists', { name: variantName(solution.label) })}</h2>
           <button type="button" className="pill-btn" aria-expanded={expanded} onClick={() => setExpanded((v) => !v)}>
-            {expanded ? <CollapseIcon /> : <ExpandIcon />}{expanded ? 'Collapse' : 'Expand'}
+            {expanded ? <CollapseIcon /> : <ExpandIcon />}{expanded ? t('Collapse') : t('Expand')}
           </button>
-          <button type="button" className="roster-close" aria-label="Close" onClick={onClose}>✕</button>
+          <button type="button" className="roster-close" aria-label={t('Close')} onClick={onClose}>✕</button>
         </div>
 
         {loadingStudents ? <div className="spinner" /> : !expanded ? (
           <div className="roster-compact">
             {classes.map((c) => (
               <section key={c.classNumber} className="roster-block" aria-label={classLabel(c.classNumber)}>
-                <h3 className="roster-block-head"><span>{classLabel(c.classNumber)}</span><span>{c.members.length} students</span></h3>
+                <h3 className="roster-block-head"><span>{classLabel(c.classNumber)}</span><span>{c.members.length === 1 ? t('{n} student', { n: c.members.length }) : t('{n} students', { n: c.members.length })}</span></h3>
                 <ul className="chip-list">
                   {c.members.map((m) => <li key={m.studentId} className="name-chip">{m.name}</li>)}
                 </ul>
@@ -175,12 +183,12 @@ export default function RosterModal({ solution, onClose }: { solution: Solution;
           <div className="roster-expanded">
             <section className="roster-col">
               <div className="roster-col-head">
-                <h3 className="caps-label">Class roster</h3>
+                <h3 className="caps-label">{t('Class roster')}</h3>
                 <ExportButton solutionId={solution.id} />
               </div>
-              <div className="roster-table" role="table" aria-label="Class roster">
+              <div className="roster-table" role="table" aria-label={t('Class roster')}>
                 <div className="roster-table-head" role="row">
-                  <span role="columnheader">Class</span><span role="columnheader">Student</span>
+                  <span role="columnheader">{t('Class')}</span><span role="columnheader">{t('Student')}</span>
                 </div>
                 {classes.flatMap((c) => c.members.map((m) => (
                   <div key={m.studentId} className="roster-table-row" role="row">
@@ -191,11 +199,11 @@ export default function RosterModal({ solution, onClose }: { solution: Solution;
               </div>
             </section>
             <section className="roster-col">
-              <div className="roster-col-head"><h3 className="caps-label">Preference map</h3></div>
+              <div className="roster-col-head"><h3 className="caps-label">{t('Preference map')}</h3></div>
               <PreferenceMap classes={classes} pairs={pairs} names={names} />
             </section>
             <p className="roster-fullpage">
-              <Link to={`/solutions/${solution.id}`}>Open full page — sharing and permalink</Link>
+              <Link to={`/solutions/${solution.id}`}>{t('Open full page — sharing and permalink')}</Link>
             </p>
           </div>
         )}

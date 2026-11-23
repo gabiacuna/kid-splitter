@@ -1,9 +1,10 @@
+import { translate } from '../i18n';
 import type { BinaryConstraint, ClassAssignment, Student } from './types';
 
 export interface RosterMember { studentId: string; name: string; student?: Student }
 export interface RosterClass { classNumber: number; members: RosterMember[] }
 
-export const studentName = (s?: Student) => (s ? `${s.first_name} ${s.last_name}` : '[Removed student]');
+export const studentName = (s?: Student) => (s ? `${s.first_name} ${s.last_name}` : translate('[Removed student]'));
 
 /** "Amara O." names, falling back to the full name where two would collide.
  *  Same rule as the backend's short_display_names(), so chips match explanations. */

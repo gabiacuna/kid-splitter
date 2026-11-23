@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react';
+import { translate } from '../i18n';
 
 // Must match the num_classes validators in backend/app/schemas/{cohort,solve}.py.
 export const MIN_CLASSES = 2;
@@ -17,5 +18,5 @@ export function classColorStyle(classNumber: number): CSSProperties {
 
 /** "Class A", "Class B", … — the design's naming; used everywhere a class is shown. */
 export function classLabel(classNumber: number): string {
-  return `Class ${String.fromCharCode(64 + classNumber)}`;
+  return translate('Class {letter}', { letter: String.fromCharCode(64 + classNumber) });
 }

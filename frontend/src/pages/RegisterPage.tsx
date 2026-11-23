@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import api from '../lib/api';
 import { useAuth } from '../hooks/useAuth';
+import { useT } from '../i18n';
 
 interface FieldErrors {
   school_name?: string;
@@ -11,6 +12,7 @@ interface FieldErrors {
 }
 
 export default function RegisterPage() {
+  const t = useT();
   const { teacher } = useAuth();
   const [schoolName, setSchoolName] = useState('');
   const [email, setEmail] = useState('');
@@ -24,10 +26,10 @@ export default function RegisterPage() {
   if (teacher) return <Navigate to="/cohorts" replace />;
 
   function validateField(name: string, value: string): string {
-    if (name === 'school_name' && !value.trim()) return 'School name is required.';
-    if (name === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return 'Enter a valid email.';
-    if (name === 'password' && value.length < 8) return 'Password must be at least 8 characters.';
-    if (name === 'confirm' && value !== password) return 'Passwords do not match.';
+    if (name === 'school_name' && !value.trim()) return t('School name is required.');
+    if (name === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return t('Enter a valid email.');
+    if (name === 'password' && value.length < 8) return t('Password must be at least 8 characters.');
+    if (name === 'confirm' && value !== password) return t('Passwords do not match.');
     return '';
   }
 
@@ -59,9 +61,9 @@ export default function RegisterPage() {
     } catch (err: unknown) {
       const status = (err as { response?: { status: number } }).response?.status;
       if (status === 409) {
-        setFieldErrors((prev) => ({ ...prev, email: 'An account with this email already exists.' }));
+        setFieldErrors((prev) => ({ ...prev, email: t('An account with this email already exists.') }));
       } else {
-        setServerError('Something went wrong. Try again.');
+        setServerError(t('Something went wrong. Try again.'));
       }
     } finally {
       setLoading(false);
@@ -73,13 +75,13 @@ export default function RegisterPage() {
       <div className="auth-page">
         <div className="auth-card" style={{ textAlign: 'center' }}>
           <div style={{ fontSize: 40, marginBottom: 16 }}>✉️</div>
-          <h2 className="auth-title">Check your email</h2>
+          <h2 className="auth-title">{t('Check your email')}</h2>
           <p style={{ color: 'var(--text2)', marginTop: 8 }}>
-            We sent a confirmation link to <strong>{email}</strong>.
-            Click it to activate your account.
+            {t('We sent a confirmation link to')} <strong>{email}</strong>.{' '}
+            {t('Click it to activate your account.')}
           </p>
           <p className="auth-link" style={{ marginTop: 20 }}>
-            <Link to="/login">Back to sign in</Link>
+            <Link to="/login">{t('Back to sign in')}</Link>
           </p>
         </div>
       </div>
@@ -93,11 +95,11 @@ export default function RegisterPage() {
           <span className="nav-logo-icon material-symbols-outlined">groups_3</span>
           kid splitter
         </div>
-        <h1 className="auth-title">Create account</h1>
-        <p className="auth-subtitle">Get started in seconds</p>
+        <h1 className="auth-title">{t('Create account')}</h1>
+        <p className="auth-subtitle">{t('Get started in seconds')}</p>
         <form className="auth-form" onSubmit={handleSubmit}>
           <div className="form-field">
-            <label className="form-label">School name</label>
+            <label className="form-label">{t('School name')}</label>
             <input
               type="text"
               required
@@ -106,12 +108,12 @@ export default function RegisterPage() {
               onChange={(e) => setSchoolName(e.target.value)}
               onBlur={(e) => handleBlur('school_name', e.target.value)}
               disabled={loading}
-              placeholder="Sunnybrook Primary"
+              placeholder={t('Sunnybrook Primary')}
             />
             {fieldErrors.school_name && <span className="form-error">{fieldErrors.school_name}</span>}
           </div>
           <div className="form-field">
-            <label className="form-label">Email</label>
+            <label className="form-label">{t('Email')}</label>
             <input
               type="email"
               required
@@ -119,12 +121,12 @@ export default function RegisterPage() {
               onChange={(e) => setEmail(e.target.value)}
               onBlur={(e) => handleBlur('email', e.target.value)}
               disabled={loading}
-              placeholder="you@school.edu"
+              placeholder={t('you@school.edu')}
             />
             {fieldErrors.email && <span className="form-error">{fieldErrors.email}</span>}
           </div>
           <div className="form-field">
-            <label className="form-label">Password</label>
+            <label className="form-label">{t('Password')}</label>
             <input
               type="password"
               required
@@ -133,12 +135,12 @@ export default function RegisterPage() {
               onChange={(e) => setPassword(e.target.value)}
               onBlur={(e) => handleBlur('password', e.target.value)}
               disabled={loading}
-              placeholder="min 8 characters"
+              placeholder={t('min 8 characters')}
             />
             {fieldErrors.password && <span className="form-error">{fieldErrors.password}</span>}
           </div>
           <div className="form-field">
-            <label className="form-label">Confirm password</label>
+            <label className="form-label">{t('Confirm password')}</label>
             <input
               type="password"
               required
@@ -146,17 +148,17 @@ export default function RegisterPage() {
               onChange={(e) => setConfirm(e.target.value)}
               onBlur={(e) => handleBlur('confirm', e.target.value)}
               disabled={loading}
-              placeholder="repeat password"
+              placeholder={t('repeat password')}
             />
             {fieldErrors.confirm && <span className="form-error">{fieldErrors.confirm}</span>}
           </div>
           {serverError && <span className="form-error">{serverError}</span>}
           <button className="btn btn-primary" type="submit" disabled={loading} style={{ width: '100%', marginTop: 4 }}>
-            {loading ? 'Creating account…' : 'Create account'}
+            {loading ? t('Creating account…') : t('Create account')}
           </button>
         </form>
         <p className="auth-link">
-          Already have an account? <Link to="/login">Sign in</Link>
+          {t('Already have an account?')} <Link to="/login">{t('Sign in')}</Link>
         </p>
       </div>
     </div>

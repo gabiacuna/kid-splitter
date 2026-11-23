@@ -4,26 +4,29 @@ import api from '../lib/api';
 import type { Student } from '../lib/types';
 import { genderLabel, nextGender } from '../lib/gender';
 import { useToast } from './Toast';
+import { useT } from '../i18n';
 
 const TAG_REGEX = /^[a-z0-9-]+$/;
 
 function TagPill({ tag, onRemove }: { tag: string; onRemove: () => void }) {
+  const t = useT();
   return (
     <span className="tag-pill">
       {tag}
-      <button type="button" onClick={onRemove} title="Remove tag">×</button>
+      <button type="button" onClick={onRemove} title={t('Remove tag')}>×</button>
     </span>
   );
 }
 
 function TagInput({ onAdd }: { onAdd: (tag: string) => void }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [val, setVal] = useState('');
 
   function commit() {
-    const t = val.toLowerCase().trim();
-    if (t && TAG_REGEX.test(t) && t.length <= 30) {
-      onAdd(t);
+    const tag = val.toLowerCase().trim();
+    if (tag && TAG_REGEX.test(tag) && tag.length <= 30) {
+      onAdd(tag);
     }
     setVal('');
     setOpen(false);
@@ -36,7 +39,7 @@ function TagInput({ onAdd }: { onAdd: (tag: string) => void }) {
         onClick={() => setOpen(true)}
         style={{ fontSize: 12, color: 'var(--teal)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px' }}
       >
-        + tag
+        {t('+ tag')}
       </button>
     );
   }
@@ -57,13 +60,14 @@ function TagInput({ onAdd }: { onAdd: (tag: string) => void }) {
       onBlur={commit}
       maxLength={30}
       style={{ width: 80, padding: '2px 6px', fontSize: 12 }}
-      placeholder="tag-name"
+      placeholder={t('tag-name')}
     />
   );
 }
 
 
 function GenderCell({ student, onCycle }: { student: Student; onCycle: () => void }) {
+  const t = useT();
   const g = student.gender;
   return (
     <button
@@ -71,8 +75,11 @@ function GenderCell({ student, onCycle }: { student: Student; onCycle: () => voi
       className="gender-cycle"
       data-gender={g ?? 'none'}
       onClick={onCycle}
-      title="Click to change (Boy → Girl → unknown)"
-      aria-label={`Gender for ${student.first_name} ${student.last_name}: ${genderLabel(g, 'unknown')}. Activate to change.`}
+      title={t('Click to change (Boy → Girl → unknown)')}
+      aria-label={t('Gender for {name}: {label}. Activate to change.', {
+        name: `${student.first_name} ${student.last_name}`,
+        label: genderLabel(g, t('unknown')),
+      })}
     >
       {genderLabel(g)}
     </button>
@@ -85,6 +92,7 @@ interface StudentTableProps {
 }
 
 export default function StudentTable({ cohortId, students }: StudentTableProps) {
+  const t = useT();
   const qc = useQueryClient();
   const { showToast } = useToast();
   const [savingTags, setSavingTags] = useState<Set<string>>(new Set());
@@ -104,10 +112,10 @@ export default function StudentTable({ cohortId, students }: StudentTableProps) 
       qc.invalidateQueries({ queryKey: ['students', cohortId] });
       qc.invalidateQueries({ queryKey: ['cohorts'] });
       const s = students.find((x) => x.id === id);
-      if (s) showToast(`Student removed. Any constraints involving ${s.first_name} were also removed.`, 'success');
+      if (s) showToast(t('Student removed. Any constraints involving {name} were also removed.', { name: s.first_name }), 'success');
       setConfirmDelete(null);
     },
-    onError: () => showToast('Failed to remove student.', 'error'),
+    onError: () => showToast(t('Failed to remove student.'), 'error'),
   });
 
   async function updateTags(student: Student, tags: string[]) {
@@ -116,7 +124,7 @@ export default function StudentTable({ cohortId, students }: StudentTableProps) 
       await enqueueWrite(student.id, { tags });
       qc.invalidateQueries({ queryKey: ['students', cohortId] });
     } catch {
-      showToast('Failed to update tags.', 'error');
+      showToast(t('Failed to update tags.'), 'error');
     } finally {
       setSavingTags((prev) => { const s = new Set(prev); s.delete(student.id); return s; });
     }
@@ -136,7 +144,7 @@ export default function StudentTable({ cohortId, students }: StudentTableProps) 
     try {
       await enqueueWrite(studentId, { gender: next });
     } catch {
-      showToast('Failed to update gender.', 'error');
+      showToast(t('Failed to update gender.'), 'error');
       qc.invalidateQueries({ queryKey: key }); // resync with the server's truth
     }
   }
@@ -147,7 +155,7 @@ export default function StudentTable({ cohortId, students }: StudentTableProps) 
   }
 
   function handleRemoveTag(student: Student, tag: string) {
-    updateTags(student, student.tags.filter((t) => t !== tag));
+    updateTags(student, student.tags.filter((x) => x !== tag));
   }
 
   if (students.length === 0) return null;
@@ -157,11 +165,11 @@ export default function StudentTable({ cohortId, students }: StudentTableProps) 
       <table>
         <thead>
           <tr>
-            <th>First name</th>
-            <th>Last name</th>
-            <th>Gender</th>
-            <th>Tags</th>
-            <th>Actions</th>
+            <th>{t('First name')}</th>
+            <th>{t('Last name')}</th>
+            <th>{t('Gender')}</th>
+            <th>{t('Tags')}</th>
+            <th>{t('Actions')}</th>
           </tr>
         </thead>
         <tbody>
@@ -175,10 +183,10 @@ export default function StudentTable({ cohortId, students }: StudentTableProps) 
                 <td><GenderCell student={s} onCycle={() => cycleGender(s.id)} /></td>
                 <td>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center', opacity: saving ? 0.5 : 1, pointerEvents: saving ? 'none' : undefined }}>
-                    {s.tags.map((t) => (
-                      <TagPill key={t} tag={t} onRemove={() => handleRemoveTag(s, t)} />
+                    {s.tags.map((tag) => (
+                      <TagPill key={tag} tag={tag} onRemove={() => handleRemoveTag(s, tag)} />
                     ))}
-                    {s.tags.length < 10 && <TagInput onAdd={(t) => handleAddTag(s, t)} />}
+                    {s.tags.length < 10 && <TagInput onAdd={(tag) => handleAddTag(s, tag)} />}
                     {saving && <span className="spinner" style={{ width: 14, height: 14, borderWidth: 2 }} />}
                   </div>
                 </td>
@@ -186,7 +194,7 @@ export default function StudentTable({ cohortId, students }: StudentTableProps) 
                   {deleting ? (
                     <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                       <span style={{ fontSize: 12.5, color: 'var(--text2)' }}>
-                        Remove {s.first_name} {s.last_name}?
+                        {t('Remove {name}?', { name: `${s.first_name} ${s.last_name}` })}
                       </span>
                       <button
                         className="btn btn-danger"
@@ -194,14 +202,14 @@ export default function StudentTable({ cohortId, students }: StudentTableProps) 
                         onClick={() => deleteMutation.mutate(s.id)}
                         disabled={deleteMutation.isPending}
                       >
-                        {deleteMutation.isPending ? '…' : 'Remove'}
+                        {deleteMutation.isPending ? '…' : t('Remove')}
                       </button>
                       <button
                         className="btn btn-secondary"
                         style={{ padding: '4px 10px', fontSize: 12 }}
                         onClick={() => setConfirmDelete(null)}
                       >
-                        Cancel
+                        {t('Cancel')}
                       </button>
                     </div>
                   ) : (
@@ -210,7 +218,7 @@ export default function StudentTable({ cohortId, students }: StudentTableProps) 
                       style={{ padding: '4px 10px', fontSize: 12, color: 'var(--coral)' }}
                       onClick={() => setConfirmDelete(s.id)}
                     >
-                      Delete
+                      {t('Delete')}
                     </button>
                   )}
                 </td>
