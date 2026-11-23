@@ -19,7 +19,7 @@ from ..models.teacher import Teacher
 from ..schemas.solve import SolveRequest, SolveResponse, SolutionOut, SolutionDetailOut, SolverMetadata, AssignmentOut, GenderSplit
 from ..schemas.constraint import ContradictionOut
 from ..services.solver import SolverInput, run_solver
-from ..services.validator import detect_contradictions
+from ..services.validator import detect_contradictions, short_display_names
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["solve"])
@@ -106,7 +106,12 @@ async def solve(
         select(UnaryConstraint).where(UnaryConstraint.cohort_id == cohort.id)
     )).scalars().all()
 
-    contradictions = detect_contradictions(list(binary), body.num_classes, total_students)
+    name_rows = (await db.execute(
+        select(Student.id, Student.first_name, Student.last_name).where(Student.cohort_id == cohort.id)
+    )).all()
+    contradictions = detect_contradictions(
+        list(binary), body.num_classes, total_students, short_display_names(name_rows)
+    )
     hard = [c for c in contradictions if c.type != "soft_warning"]
     if hard:
         raise HTTPException(

@@ -131,6 +131,12 @@ All 6 router domains are scaffolded and all endpoints exist. The core happy path
 
 ## Changelog
 
+### 2026-11-23 — conflict groups (design feature 04)
+1. **`GET /cohorts/{id}/constraints/validate` returns `conflict_groups`** — each group has the exact constraint ids involved (badge number = group id), severity, and a plain-language explanation using student names. `contradictions` is kept (deprecated) for one release.
+2. **`coloring_impossible` is exact** (CP-SAT, 2s limit, permissive on timeout). Greedy colouring could reject solvable cohorts with a false 422.
+3. **New `chain_conflict` check** — must-be-apart students linked by a chain of must-be-together rules (previously undetected until the solver failed).
+4. **Binary/unary `PUT` accept student ids** — changing a rule's students previously no-op'd silently.
+
 ### 2026-11-23 — gender (design features 01–03)
 1. **`students.gender`** (`'boy' | 'girl' | NULL`, CHECK-constrained). `PUT /students/{id}` uses `model_fields_set`, so an explicit `"gender": null` clears it. CSV import reads an optional `gender` column (b/boy/m/male, g/girl/f/female); unrecognised values import as unknown with status `invalid_gender`.
 2. **`cohorts.balance_gender`** (bool, default false) on create/update/out.

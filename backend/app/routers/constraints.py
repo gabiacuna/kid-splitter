@@ -12,9 +12,9 @@ from ..models.teacher import Teacher
 from ..schemas.constraint import (
     BinaryConstraintCreate, BinaryConstraintUpdate, BinaryConstraintOut,
     UnaryConstraintCreate, UnaryConstraintUpdate, UnaryConstraintOut,
-    ConstraintListOut, ValidationOut, ContradictionOut,
+    ConstraintListOut, ValidationOut, ContradictionOut, ConflictGroupOut,
 )
-from ..services.validator import detect_contradictions
+from ..services.validator import detect_conflicts, short_display_names
 
 router = APIRouter(tags=["constraints"])
 
@@ -119,6 +119,16 @@ async def update_binary_constraint(
         raise HTTPException(status_code=403)
     await _verify_constraint_ownership(c, teacher, db)
 
+    # Students are editable too (the editor autosaves every field).
+    new_a = body.student_a_id or c.student_a_id
+    new_b = body.student_b_id or c.student_b_id
+    if new_a == new_b:
+        raise HTTPException(status_code=422, detail="student_a_id and student_b_id must be different")
+    for sid in {new_a, new_b} - {c.student_a_id, c.student_b_id}:
+        if not await _student_in_cohort(sid, c.cohort_id, db):
+            raise HTTPException(status_code=422, detail="Student not found in this cohort")
+    c.student_a_id, c.student_b_id = new_a, new_b
+
     if body.type is not None:
         c.type = body.type
     if body.is_hard is not None:
@@ -145,6 +155,10 @@ async def update_unary_constraint(
         raise HTTPException(status_code=403)
     await _verify_constraint_ownership(c, teacher, db)
 
+    if body.student_id is not None and body.student_id != c.student_id:
+        if not await _student_in_cohort(body.student_id, c.cohort_id, db):
+            raise HTTPException(status_code=422, detail="Student not found in this cohort")
+        c.student_id = body.student_id
     if body.type is not None:
         c.type = body.type
     if body.tag is not None:
@@ -198,17 +212,23 @@ async def validate_constraints(
         select(BinaryConstraint).where(BinaryConstraint.cohort_id == cohort.id)
     )).scalars().all()
 
-    from sqlalchemy import func
-    total_students = await db.scalar(
-        select(func.count(Student.id)).where(Student.cohort_id == cohort.id)
-    ) or 0
+    students = (await db.execute(
+        select(Student.id, Student.first_name, Student.last_name).where(Student.cohort_id == cohort.id)
+    )).all()
+    names = short_display_names(students)
 
-    contradictions = detect_contradictions(list(binary), cohort.num_classes, total_students)
-    hard = [c for c in contradictions if c.type != "soft_warning"]
+    groups = detect_conflicts(list(binary), cohort.num_classes, len(students), names)
     return ValidationOut(
-        has_contradictions=bool(hard),
+        has_contradictions=any(g.severity == "hard" for g in groups),
+        conflict_groups=[
+            ConflictGroupOut(
+                id=g.id, type=g.type, severity=g.severity,
+                constraint_ids=g.constraint_ids, student_ids=g.student_ids, explanation=g.explanation,
+            )
+            for g in groups
+        ],
         contradictions=[
-            ContradictionOut(type=c.type, message=c.message, student_ids=c.student_ids)
-            for c in contradictions
+            ContradictionOut(type=g.type, message=g.explanation, student_ids=g.student_ids)
+            for g in groups
         ],
     )

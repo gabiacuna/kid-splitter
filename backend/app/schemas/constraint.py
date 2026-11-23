@@ -32,6 +32,8 @@ class BinaryConstraintCreate(BaseModel):
 
 
 class BinaryConstraintUpdate(BaseModel):
+    student_a_id: Optional[str] = None
+    student_b_id: Optional[str] = None
     type:    Optional[BINARY_TYPES] = None
     is_hard: Optional[bool] = None
     weight:  Optional[float] = None
@@ -73,6 +75,7 @@ class UnaryConstraintCreate(BaseModel):
 
 
 class UnaryConstraintUpdate(BaseModel):
+    student_id: Optional[str] = None
     type:      Optional[UNARY_TYPES] = None
     tag:       Optional[str] = None
     parameter: Optional[int] = None
@@ -133,6 +136,16 @@ class ContradictionOut(BaseModel):
     student_ids: list[str]
 
 
+class ConflictGroupOut(BaseModel):
+    id:             int
+    type:           str
+    severity:       Literal["hard", "soft"]
+    constraint_ids: list[str]
+    student_ids:    list[str]
+    explanation:    str
+
+
 class ValidationOut(BaseModel):
     has_contradictions: bool
-    contradictions:     list[ContradictionOut]
+    conflict_groups:    list[ConflictGroupOut]
+    contradictions:     list[ContradictionOut]  # deprecated: drop after the frontend moves to conflict_groups
