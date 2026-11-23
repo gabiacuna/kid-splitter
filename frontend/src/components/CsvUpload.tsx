@@ -8,6 +8,7 @@ function StatusBadge({ status }: { status: PreviewRow['status'] }) {
   if (status === 'ok') return <span className="badge badge-sage">OK</span>;
   if (status === 'duplicate') return <span className="badge badge-warn">Duplicate</span>;
   if (status === 'invalid_tag') return <span className="badge badge-red">Invalid tag</span>;
+  if (status === 'invalid_gender') return <span className="badge badge-warn">Gender unclear</span>;
   return <span className="badge badge-red">Missing name</span>;
 }
 
@@ -126,10 +127,11 @@ function PreviewModal({
     mutationFn: () => {
       const students = rows
         .filter((r) => !isErrorRow(r))
-        .map(({ first_name, last_name, tags, preferences }) => ({
+        .map(({ first_name, last_name, tags, gender, preferences }) => ({
           first_name,
           last_name,
           tags,
+          gender: gender ?? null,
           preferences: preferences.map((p) => p.name),
         }));
       return api
@@ -148,6 +150,8 @@ function PreviewModal({
   const hasErrors = rows.some(isErrorRow);
   const validCount = rows.filter((r) => !isErrorRow(r)).length;
   const hasPreferences = rows.some((r) => r.preferences.length > 0);
+  const hasGender = rows.some((r) => r.gender || r.status === 'invalid_gender');
+  const unclearGenderCount = rows.filter((r) => r.status === 'invalid_gender').length;
   const unresolvedCount = rows.reduce(
     (n, r) => n + r.preferences.filter((p) => p.status !== 'matched').length,
     0,
@@ -170,7 +174,7 @@ function PreviewModal({
       row_index: r.row_index,
       first_name: r.first_name,
       last_name: r.last_name,
-      importable: r.status === 'ok',
+      importable: !isErrorRow(r),  // must match what confirm actually imports
     }));
     const applyMatch = (match: PreferenceMatch) => setRows((prev) => prev.map((r, i) =>
       i === rowIndex
@@ -201,6 +205,12 @@ function PreviewModal({
             Rows marked "Missing name" or "Invalid tag" will be skipped.
           </div>
         )}
+        {unclearGenderCount > 0 && (
+          <div className="warn-banner" style={{ marginBottom: 12 }}>
+            {unclearGenderCount} {unclearGenderCount === 1 ? 'row has' : 'rows have'} a gender value we didn’t recognise.
+            {' '}{unclearGenderCount === 1 ? 'It' : 'They'} will be imported with gender unknown — set it in the student table afterwards.
+          </div>
+        )}
         {unresolvedCount > 0 && (
           <div className="warn-banner" style={{ marginBottom: 12 }}>
             {unresolvedCount} pairing {unresolvedCount === 1 ? 'name' : 'names'} could not be matched to a
@@ -213,6 +223,7 @@ function PreviewModal({
               <tr>
                 <th>First name</th>
                 <th>Last name</th>
+                {hasGender && <th>Gender</th>}
                 <th>Tags</th>
                 {hasPreferences && <th>Pair with</th>}
                 <th>Status</th>
@@ -237,6 +248,11 @@ function PreviewModal({
                       style={{ width: '100%', padding: '4px 8px' }}
                     />
                   </td>
+                  {hasGender && (
+                    <td style={{ fontSize: 12.5, color: row.gender ? undefined : 'var(--text3)' }}>
+                      {row.gender === 'boy' ? 'Boy' : row.gender === 'girl' ? 'Girl' : '—'}
+                    </td>
+                  )}
                   <td style={{ fontSize: 12.5 }}>{row.tags.join(', ')}</td>
                   {hasPreferences && (
                     <td style={{ fontSize: 12.5 }}>

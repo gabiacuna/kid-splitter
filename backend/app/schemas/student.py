@@ -1,9 +1,11 @@
 from pydantic import BaseModel, field_validator
-from typing import Optional
+from typing import Literal, Optional
 from datetime import datetime
 import re
 
 TAG_RE = re.compile(r'^[a-zA-Z0-9\-]{1,30}$')
+
+Gender = Literal["boy", "girl"]
 
 
 def validate_tags(tags: list[str]) -> list[str]:
@@ -30,6 +32,7 @@ class StudentCreate(BaseModel):
     first_name: str
     last_name:  str
     tags:       list[str] = []
+    gender:     Optional[Gender] = None
 
     @field_validator("first_name")
     @classmethod
@@ -48,6 +51,8 @@ class StudentUpdate(BaseModel):
     first_name: Optional[str] = None
     last_name:  Optional[str] = None
     tags:       Optional[list[str]] = None
+    # None means "unknown" here, not "unchanged": the router checks model_fields_set.
+    gender:     Optional[Gender] = None
 
     @field_validator("first_name")
     @classmethod
@@ -71,8 +76,12 @@ class StudentUpdate(BaseModel):
         return validate_tags(v)
 
 
+class ImportStudent(StudentCreate):
+    preferences: list[str] = []   # classmate names; resolved server-side into soft "together" constraints
+
+
 class ImportConfirmRequest(BaseModel):
-    students: list[StudentCreate]
+    students: list[ImportStudent]
 
 
 class StudentOut(BaseModel):
@@ -82,9 +91,16 @@ class StudentOut(BaseModel):
     last_name:     str
     tags:          list[str]
     import_source: Optional[str]
+    gender:        Optional[Gender]
     created_at:    datetime
 
     model_config = {"from_attributes": True}
+
+
+class PreferenceMatchOut(BaseModel):
+    name:            str
+    status:          Literal["matched", "ambiguous", "unresolved"]
+    matched_display: Optional[str] = None
 
 
 class ImportPreviewRow(BaseModel):
@@ -92,12 +108,34 @@ class ImportPreviewRow(BaseModel):
     first_name:     str
     last_name:      str
     tags:           list[str]
+    gender:         Optional[Gender] = None
     status:         str
     status_message: Optional[str] = None
+    preferences:    list[PreferenceMatchOut] = []
 
 
 class ImportPreviewResponse(BaseModel):
-    rows:        list[ImportPreviewRow]
-    total:       int
-    ok_count:    int
-    error_count: int
+    rows:                   list[ImportPreviewRow]
+    total:                  int
+    ok_count:               int
+    error_count:            int
+    preferences_matched:    int
+    preferences_unresolved: int
+
+
+class RosterRow(BaseModel):
+    row_index:  int
+    first_name: str
+    last_name:  str
+    importable: bool
+
+
+class RematchRequest(BaseModel):
+    name:           str
+    self_row_index: int
+    rows:           list[RosterRow]
+
+
+class ImportConfirmResponse(BaseModel):
+    students:            list[StudentOut]
+    constraints_created: int
