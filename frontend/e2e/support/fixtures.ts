@@ -17,13 +17,20 @@ export interface Seed {
  * `seed`: ids of the pre-solved cohorts created by global.setup.ts.
  * `pageErrors` (auto): fails a test that logs a page error or console error.
  */
-export const test = base.extend<{ api: Api; seed: Seed; pageErrors: string[] }>({
+export const test = base.extend<{ api: Api; seed: Seed; pageErrors: string[]; allowHttpErrors: boolean }>({
+  /** Set via test.use({ allowHttpErrors: true }) in specs that provoke 4xx on purpose
+   *  (logged-out pages, wrong passwords). JS errors still fail the test. */
+  allowHttpErrors: [false, { option: true }],
   api: async ({ page }, use) => use(apiClient(page.request)),
   seed: async ({}, use) => use(JSON.parse(readFileSync(SEED_FILE, 'utf8'))),
-  pageErrors: [async ({ page }, use) => {
+  pageErrors: [async ({ page, allowHttpErrors }, use) => {
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
-    page.on('console', (m) => { if (m.type() === 'error') errors.push(`console: ${m.text()}`); });
+    page.on('console', (m) => {
+      if (m.type() !== 'error') return;
+      if (allowHttpErrors && /^Failed to load resource: the server responded with a status of 4\d\d/.test(m.text())) return;
+      errors.push(`console: ${m.text()}`);
+    });
     await use(errors);
     expect(errors, 'page/console errors').toEqual([]);
   }, { auto: true }],

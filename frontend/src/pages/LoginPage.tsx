@@ -21,12 +21,16 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const res = await api.post('/auth/login', { email, password });
-      setTeacher(res.data);
+      setTeacher(res.data.teacher); // response is { teacher }
       navigate('/cohorts');
     } catch (err: unknown) {
       const status = (err as { response?: { status: number } }).response?.status;
       if (status === 401) {
         setError(t('Incorrect email or password.'));
+      } else if (status === 403) {
+        setError(t('Confirm your email first — check your inbox (and spam) for the link we sent.'));
+      } else if (status === 429) {
+        setError(t('Too many attempts. Wait a few minutes and try again.'));
       } else {
         setError(t('Something went wrong. Try again.'));
       }

@@ -14,7 +14,7 @@
 | Migrations | Alembic |
 | Auth | Supabase Auth — ES256 JWT validation via the project's JWKS endpoint and `python-jose` |
 | DB | PostgreSQL 15 |
-| Password hashing | `bcrypt` |
+| Passwords | Stored only in Supabase Auth (no local hash) |
 | Validation | Pydantic v2 |
 | Rate limiting | `slowapi` |
 
@@ -58,7 +58,6 @@ All tables have `created_at TIMESTAMPTZ DEFAULT now()` and `updated_at TIMESTAMP
 ```sql
 id            UUID PRIMARY KEY DEFAULT gen_random_uuid()
 email         TEXT UNIQUE NOT NULL
-password_hash TEXT NOT NULL        -- bcrypt
 school_name   TEXT NOT NULL        -- display label only
 created_at    TIMESTAMPTZ DEFAULT now()
 updated_at    TIMESTAMPTZ DEFAULT now()

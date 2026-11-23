@@ -10,8 +10,8 @@ All 6 router domains are scaffolded and all endpoints exist. The core happy path
 
 | Endpoint | Status | Notes |
 |---|---|---|
-| POST /auth/register | ✅ Done | bcrypt hash, Supabase signup, httpOnly cookies |
-| POST /auth/login | ✅ Done | constant-time password check, Supabase token |
+| POST /auth/register | ✅ Done | Supabase signup first, then local profile; 409 for existing emails |
+| POST /auth/login | ✅ Done | Supabase verifies the password; recreates a missing local profile |
 | POST /auth/refresh | ✅ Done | exchanges refresh token with Supabase and rotates both cookies |
 | POST /auth/logout | ✅ Done | clears both cookies |
 | GET /auth/me | ✅ Done | |
@@ -130,6 +130,11 @@ All 6 router domains are scaffolded and all endpoints exist. The core happy path
 ---
 
 ## Changelog
+
+### 2026-11-23 — sign-up / login fix
+1. **Supabase is the only password store.** The local bcrypt hash could disagree with Supabase (e.g. after the dev DB was recreated, or re-registering an email Supabase already had), leaving accounts that could never log in. Migration `002` drops `teachers.password_hash`; `bcrypt` dependency removed.
+2. **Register calls Supabase before creating the local profile**, and maps Supabase's outcomes (`services/supabase_auth.py`, unit-tested in `tests/test_supabase_auth.py`): existing email (including the silent `identities: []` response) → 409, weak password → 422, rate limit → 429. Response adds `needs_confirmation`.
+3. **Login** maps unconfirmed email → 403 (was a generic 500) and recreates a missing local profile from Supabase metadata.
 
 ### 2026-11-23 — cleanup
 1. **Public share page fixed** — `GET /share/{token}` returns `classes` as a list of `{class_number, students}` (it was a dict keyed by class, which the page couldn't iterate). Stale `score`/`soft_violations` are no longer exposed publicly.

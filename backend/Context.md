@@ -14,7 +14,7 @@ Kid Splitter is a class-scheduling tool for primary school teachers. Teachers de
 | Migrations | Alembic |
 | Auth | Supabase Auth — ES256 JWT validation via the project's JWKS endpoint and `python-jose` |
 | DB | PostgreSQL 15 |
-| Password hashing | `bcrypt` |
+| Passwords | Stored only in Supabase Auth (no local hash) |
 | Validation | Pydantic v2 |
 | Rate limiting | `slowapi` |
 | Solver | OR-Tools CP-SAT |
@@ -56,7 +56,7 @@ All tables have `created_at` and `updated_at` (`TIMESTAMPTZ`). Row-level isolati
 
 | Table | Key columns |
 |---|---|
-| `teachers` | `id UUID PK`, `email UNIQUE`, `password_hash`, `school_name` |
+| `teachers` | `id UUID PK`, `email UNIQUE`, `school_name` |
 | `cohorts` | `id`, `teacher_id FK`, `name`, `year`, `num_classes` (min 2) |
 | `students` | `id`, `cohort_id FK`, `first_name`, `last_name`, `tags TEXT[]`, `import_source` |
 | `binary_constraints` | `id`, `cohort_id FK`, `student_a_id FK`, `student_b_id FK`, `type` (`together`/`separate`), `is_hard`, `weight` (0.1–10.0) |

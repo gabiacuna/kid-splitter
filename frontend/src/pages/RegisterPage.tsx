@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, Navigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
 import api from '../lib/api';
 import { useAuth } from '../hooks/useAuth';
 import { useT } from '../i18n';
@@ -13,7 +13,8 @@ interface FieldErrors {
 
 export default function RegisterPage() {
   const t = useT();
-  const { teacher } = useAuth();
+  const { teacher, setTeacher } = useAuth();
+  const navigate = useNavigate();
   const [schoolName, setSchoolName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -56,12 +57,22 @@ export default function RegisterPage() {
     setServerError('');
     setLoading(true);
     try {
-      await api.post('/auth/register', { email, password, school_name: schoolName });
-      setDone(true);
+      const res = await api.post('/auth/register', { email, password, school_name: schoolName });
+      if (res.data.needs_confirmation) {
+        setDone(true);
+      } else {
+        // No email confirmation required: the session cookies are already set.
+        setTeacher(res.data.teacher);
+        navigate('/cohorts');
+      }
     } catch (err: unknown) {
-      const status = (err as { response?: { status: number } }).response?.status;
+      const { status, data } = (err as { response?: { status: number; data?: { detail?: unknown } } }).response ?? {};
       if (status === 409) {
-        setFieldErrors((prev) => ({ ...prev, email: t('An account with this email already exists.') }));
+        setFieldErrors((prev) => ({ ...prev, email: t('An account with this email already exists. Sign in instead.') }));
+      } else if (status === 422 && typeof data?.detail === 'string') {
+        setFieldErrors((prev) => ({ ...prev, password: t('Choose a stronger password.') }));
+      } else if (status === 429) {
+        setServerError(t('Too many sign-up attempts. Wait a few minutes and try again.'));
       } else {
         setServerError(t('Something went wrong. Try again.'));
       }

@@ -6,7 +6,6 @@ requires-python = ">=3.14"
 dependencies = [
     "alembic>=1.18.5",
     "asyncpg>=0.31.0",
-    "bcrypt>=5.0.0",
     "fastapi>=0.138.2",
     "httpx>=0.28.1",
     "ortools>=9.15.6755",

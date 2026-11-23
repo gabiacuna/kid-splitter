@@ -1,5 +1,4 @@
 from pydantic import BaseModel, EmailStr, field_validator
-import re
 
 
 class RegisterRequest(BaseModel):
@@ -40,3 +39,9 @@ class TeacherOut(BaseModel):
 
 class AuthResponse(BaseModel):
     teacher: TeacherOut
+
+
+class RegisterResponse(AuthResponse):
+    # True when Supabase sent a confirmation email (no session yet); False when the
+    # account is usable immediately and auth cookies were set.
+    needs_confirmation: bool

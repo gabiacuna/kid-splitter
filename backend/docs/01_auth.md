@@ -8,7 +8,7 @@
 
 ## Responsibility
 
-Registration, login, token refresh, logout, and profile retrieval for teachers. Passwords are hashed with `bcrypt`. JWTs are issued by Supabase Auth and stored in `httpOnly` cookies.
+Registration, login, token refresh, logout, and profile retrieval for teachers. Supabase Auth is the only password store (the local `teachers` row is a profile keyed by email, with no password). JWTs are issued by Supabase Auth and stored in `httpOnly` cookies.
 
 ---
 
@@ -37,7 +37,6 @@ class Teacher(Base):
 
     id:            Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     email:         Mapped[str] = mapped_column(String, unique=True, nullable=False)
-    password_hash: Mapped[str] = mapped_column(String, nullable=False)
     school_name:   Mapped[str] = mapped_column(String, nullable=False)
     created_at:    Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at:    Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -114,20 +113,21 @@ class AuthResponse(BaseModel):
 
 ### `POST /auth/register`
 
-1. Check `email` is not already in `teachers`. If duplicate → `400 {"detail": "Email already registered"}`.
-2. Hash password: `bcrypt.hashpw(password.encode(), bcrypt.gensalt())`.
-3. Insert `Teacher` row.
-4. Issue JWT via Supabase Auth API (`POST /auth/v1/signup`) using the same email/password, so Supabase manages the token.
-5. Set `access_token` and `refresh_token` from Supabase response as `httpOnly`, `SameSite=Lax`, `Secure` (prod) cookies.
-6. Return `201` with `TeacherOut`.
+1. Check `email` is not already in `teachers`. If duplicate → `409`.
+2. Call Supabase `POST /auth/v1/signup` with `data: {school_name}` (stored as user metadata). Outcomes (`services/supabase_auth.signup_outcome`):
+   - Session returned (confirmation off) → continue, set cookies.
+   - User returned without session (confirmation on) → continue, `needs_confirmation: true`.
+   - User with `identities: []` (Supabase's response for an **existing** email when confirmation is on — nothing is created or sent), or `user_already_exists` → `409`.
+   - `weak_password` → `422`; rate limit → `429`; anything else → `502`.
+3. Only then insert the `Teacher` row — never before Supabase confirms the account exists.
+4. Return `201` with `{teacher, needs_confirmation}`.
 
 ### `POST /auth/login`
 
-1. Look up teacher by email. If not found → `401 {"detail": "Invalid credentials"}`.
-2. Verify password: `bcrypt.checkpw(...)`. If wrong → `401`. Use constant-time comparison.
-3. Call Supabase Auth `POST /auth/v1/token?grant_type=password` to get JWT pair.
-4. Set `httpOnly` cookies (`access_token`, `refresh_token`).
-5. Return `200` with `TeacherOut`.
+1. Call Supabase `POST /auth/v1/token?grant_type=password` (`services/supabase_auth.login_outcome`): invalid credentials → `401 Invalid credentials`; email not confirmed → `403`; rate limit → `429`; other failures → `502`.
+2. Look up the teacher by email; if missing (e.g. local DB recreated) create it from the Supabase user's `school_name` metadata.
+3. Set `httpOnly` cookies (`access_token`, `refresh_token`).
+4. Return `200` with `{teacher}`.
 
 > **Do not return different error messages for "user not found" vs "wrong password"** — both must return the same `401 {"detail": "Invalid credentials"}` to prevent user enumeration.
 
@@ -186,7 +186,7 @@ response.set_cookie(
 ## DO NOTs
 
 - **Do not** store tokens in the response body or in `localStorage` — XSS risk.
-- **Do not** return `password_hash` in any response schema ever.
+- **Do not** store or return passwords locally — Supabase Auth owns them.
 - **Do not** use different error messages for unknown email vs wrong password (user enumeration).
 - **Do not** issue your own JWTs — always delegate to Supabase Auth so token validation stays consistent across the app.
 - **Do not** skip the Supabase `signup` call on register — if you only insert the DB row, `current_teacher` JWT validation will fail because Supabase won't know the user.
