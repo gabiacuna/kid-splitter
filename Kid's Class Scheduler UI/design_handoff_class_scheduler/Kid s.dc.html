@@ -11,6 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
@@ -29,6 +30,7 @@
       --text3: oklch(64% 0.015 85);
       --border: oklch(90% 0.012 85);
       --shadow: 0 2px 16px oklch(20% 0.02 85 / 0.08);
+      --shadow-sm: 0 1px 6px oklch(20% 0.02 85 / 0.07);
       --shadow-md: 0 4px 24px oklch(20% 0.02 85 / 0.11);
       --r: 14px;
       --r-sm: 8px;
@@ -51,7 +53,7 @@
   <div style="max-width:1100px;margin:0 auto;padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:60px;">
     <button onClick="{{ goHome }}" style="background:none;display:flex;align-items:center;gap:10px;">
       <div style="width:32px;height:32px;border-radius:9px;background:var(--teal);display:flex;align-items:center;justify-content:center;">
-        <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="2" y="2" width="6" height="6" rx="2" fill="white"></rect><rect x="10" y="2" width="6" height="6" rx="2" fill="white" opacity=".6"></rect><rect x="2" y="10" width="6" height="6" rx="2" fill="white" opacity=".6"></rect><rect x="10" y="10" width="6" height="6" rx="2" fill="white"></rect></svg>
+        <span class="material-symbols-outlined" style="font-size:19px;color:white;">groups_2</span>
       </div>
       <span style="font-size:17px;font-weight:800;color:var(--text);letter-spacing:-0.3px;">kid splitter</span>
     </button>
@@ -70,7 +72,7 @@
         <h1 style="font-size:26px;font-weight:800;color:var(--text);letter-spacing:-0.4px;">Your cohorts</h1>
         <p style="font-size:14px;color:var(--text3);margin-top:4px;">Pick a cohort to manage students and class placements.</p>
       </div>
-      <button onClick="{{ newCohort }}" style="display:flex;align-items:center;gap:8px;background:var(--teal);color:#fff;font-weight:700;font-size:14px;padding:11px 20px;border-radius:var(--r-sm);box-shadow:0 2px 8px oklch(56% 0.11 188 / 0.3);">
+      <button onClick="{{ openNewCohort }}" style="display:flex;align-items:center;gap:8px;background:var(--teal);color:#fff;font-weight:700;font-size:14px;padding:11px 20px;border-radius:var(--r-sm);box-shadow:0 2px 8px oklch(56% 0.11 188 / 0.3);">
         <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M7.5 2v11M2 7.5h11" stroke="white" stroke-width="2.2" stroke-linecap="round"></path></svg>
         New cohort
       </button>
@@ -166,15 +168,72 @@
 
     <!-- Tabs -->
     <div style="display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:28px;">
-      <button style="padding:10px 22px;font-size:14px;font-weight:600;color:var(--text3);background:none;border-bottom:2px solid transparent;margin-bottom:-2px;">Students</button>
-      <button style="padding:10px 22px;font-size:14px;font-weight:700;color:var(--teal);background:none;border-bottom:2.5px solid var(--teal);margin-bottom:-2px;">Constraints</button>
+      <button onClick="{{ showStudentsTab }}" style="padding:10px 22px;font-size:14px;font-weight:{{ studentsTabWeight }};color:{{ studentsTabColor }};background:none;border-bottom:2.5px solid {{ studentsTabBorder }};margin-bottom:-2px;">Students</button>
+      <button onClick="{{ showConstraintsTab }}" style="padding:10px 22px;font-size:14px;font-weight:{{ constraintsTabWeight }};color:{{ constraintsTabColor }};background:none;border-bottom:2.5px solid {{ constraintsTabBorder }};margin-bottom:-2px;">Constraints</button>
       <button onClick="{{ goSolutions }}" style="padding:10px 22px;font-size:14px;font-weight:600;color:var(--text3);background:none;border-bottom:2px solid transparent;margin-bottom:-2px;">Solutions</button>
     </div>
 
+    <!-- STUDENTS TAB -->
+    <sc-if value="{{ isStudentsTab }}" hint-placeholder-val="{{ false }}">
+      <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(160px, 1fr));gap:10px;margin-bottom:8px;">
+        <sc-for list="{{ cohortStudents }}" as="stu" hint-placeholder-count="12">
+          <div style="display:flex;align-items:center;justify-content:space-between;background:#fff;border:1.5px solid var(--border);border-radius:var(--r-sm);padding:10px 12px;box-shadow:var(--shadow-sm);">
+            <span style="font-size:13px;font-weight:600;color:var(--text);">{{ stu }}</span>
+            <button style="background:none;color:var(--text3);font-size:13px;">✕</button>
+          </div>
+        </sc-for>
+      </div>
+      <button onClick="{{ openAddStudent }}" style="display:flex;align-items:center;gap:8px;padding:12px 16px;background:none;border:2px dashed var(--border);border-radius:var(--r-sm);color:var(--teal);font-weight:600;font-size:13.5px;width:100%;margin-top:4px;">
+        <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M7.5 2v11M2 7.5h11" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path></svg>
+        Add student
+      </button>
+    </sc-if>
+
+    <sc-if value="{{ isConstraintsTab }}" hint-placeholder-val="{{ true }}">
+
+    <!-- Inline AI command bar -->
+    <div style="margin-bottom:16px;">
+      <div style="display:flex;gap:8px;">
+        <div style="flex:1;background:#fff;border:1.5px solid var(--teal);border-radius:var(--r-sm);padding:2px 4px 2px 12px;display:flex;align-items:center;gap:8px;box-shadow:0 1px 3px oklch(56% 0.11 188 / 0.12);">
+          <span class="material-symbols-outlined" style="font-size:18px;color:var(--teal);">groups_2</span>
+          <input value="{{ aiDraft }}" onChange="{{ setAiDraft }}" onKeyDown="{{ aiKeyDown }}" placeholder="Tell the assistant who to add or group…" style="flex:1;border:none;outline:none;font-size:13.5px;color:var(--text);padding:10px 0;background:transparent;">
+          <button onClick="{{ sendAiMessage }}" style="background:var(--teal);color:#fff;font-weight:700;font-size:12.5px;padding:8px 16px;border-radius:8px;flex-shrink:0;">Send</button>
+        </div>
+        <button style="background:var(--bg2);color:var(--text2);font-size:13px;font-weight:700;padding:0 16px;border-radius:var(--r-sm);flex-shrink:0;">+ Manual</button>
+      </div>
+      <sc-if value="{{ hasAiThread }}" hint-placeholder-val="{{ false }}">
+        <div style="background:var(--bg2);border-radius:var(--r-sm);padding:12px 14px;margin-top:10px;display:flex;flex-direction:column;gap:8px;">
+          <sc-for list="{{ aiThread }}" as="msg" hint-placeholder-count="2">
+            <div style="font-size:12.5px;line-height:1.4;color:{{ msg.color }};"><b>{{ msg.who }}:</b> {{ msg.text }}</div>
+          </sc-for>
+        </div>
+      </sc-if>
+    </div>
+
     <!-- Warning Banner -->
-    <div style="background:var(--warn);border:1.5px solid var(--warn-border);border-radius:var(--r-sm);padding:12px 16px;margin-bottom:24px;display:flex;align-items:center;gap:10px;">
-      <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 2L16.5 15H1.5L9 2z" fill="oklch(78% 0.14 75)" stroke="oklch(65% 0.13 70)" stroke-width="1.2" stroke-linejoin="round"></path><path d="M9 7v4" stroke="oklch(35% 0.09 70)" stroke-width="1.6" stroke-linecap="round"></path><circle cx="9" cy="13" r="0.9" fill="oklch(35% 0.09 70)"></circle></svg>
-      <span style="font-size:13.5px;font-weight:600;color:var(--warn-text);">1 contradiction found — resolve before solving.</span>
+    <div style="background:var(--warn);border:1.5px solid var(--warn-border);border-radius:var(--r-sm);padding:12px 16px;margin-bottom:24px;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" style="flex-shrink:0;"><path d="M9 2L16.5 15H1.5L9 2z" fill="oklch(78% 0.14 75)" stroke="oklch(65% 0.13 70)" stroke-width="1.2" stroke-linejoin="round"></path><path d="M9 7v4" stroke="oklch(35% 0.09 70)" stroke-width="1.6" stroke-linecap="round"></path><circle cx="9" cy="13" r="0.9" fill="oklch(35% 0.09 70)"></circle></svg>
+        <span style="font-size:13.5px;font-weight:600;color:var(--warn-text);flex:1;">1 contradiction found — resolve before solving.</span>
+        <button onClick="{{ toggleWhy }}" style="background:none;color:var(--warn-text);font-size:12.5px;font-weight:700;text-decoration:underline;flex-shrink:0;">{{ whyLabel }}</button>
+      </div>
+      <sc-if value="{{ whyExpanded }}" hint-placeholder-val="{{ false }}">
+        <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--warn-border);">
+          <p style="font-size:13px;line-height:1.5;color:var(--warn-text);margin:0;">
+            <b>Row 1</b> requires Amara O. and Ben K. to be <b>Together</b> (hard). <b>Row 4</b> requires George P. and Amara O. to be <b>Separate</b> (hard). Since George P. and Ben K. are already assigned to the same class, both hard rules can't be satisfied at once.
+          </p>
+          <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
+            <span style="display:inline-flex;align-items:center;gap:6px;background:#fff;border:1.5px solid oklch(78% 0.14 75);border-radius:20px;padding:4px 10px 4px 8px;font-size:12px;font-weight:700;color:var(--warn-text);">
+              <span style="background:oklch(78% 0.14 75);color:#fff;border-radius:50%;width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;font-size:10px;">1</span>
+              Amara O. + Ben K. — Together
+            </span>
+            <span style="display:inline-flex;align-items:center;gap:6px;background:#fff;border:1.5px solid oklch(78% 0.14 75);border-radius:20px;padding:4px 10px 4px 8px;font-size:12px;font-weight:700;color:var(--warn-text);">
+              <span style="background:oklch(78% 0.14 75);color:#fff;border-radius:50%;width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;font-size:10px;">4</span>
+              George P. + Amara O. — Separate
+            </span>
+          </div>
+        </div>
+      </sc-if>
     </div>
 
     <!-- Constraint rows -->
@@ -191,7 +250,8 @@
       </div>
 
       <!-- Row 1 – Highlighted (contradiction) -->
-      <div style="display:grid;grid-template-columns:1fr 1fr 110px 70px 120px 36px;gap:12px;align-items:center;background:#fff;border-radius:var(--r-sm);padding:14px 16px;box-shadow:var(--shadow);border:1.5px solid oklch(78% 0.14 75);background:oklch(97% 0.04 85);">
+      <div style="display:grid;grid-template-columns:1fr 1fr 110px 70px 120px 36px;gap:12px;align-items:center;background:#fff;border-radius:var(--r-sm);padding:14px 16px;box-shadow:var(--shadow);border:1.5px solid oklch(78% 0.14 75);background:oklch(97% 0.04 85);position:relative;">
+        <span style="position:absolute;left:-9px;top:-9px;background:oklch(78% 0.14 75);color:#fff;border-radius:50%;width:18px;height:18px;display:flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:700;box-shadow:0 1px 3px rgba(0,0,0,0.2);">1</span>
         <select style="padding:8px 10px;border-radius:var(--r-sm);border:1.5px solid var(--border);font-size:13.5px;color:var(--text);background:#fff;width:100%;"><option>Amara O.</option><option>Ben K.</option><option>Chloe R.</option></select>
         <select style="padding:8px 10px;border-radius:var(--r-sm);border:1.5px solid var(--border);font-size:13.5px;color:var(--text);background:#fff;width:100%;"><option>Ben K.</option><option>Amara O.</option><option>Chloe R.</option></select>
         <span style="display:inline-flex;align-items:center;justify-content:center;padding:5px 12px;border-radius:20px;background:oklch(91% 0.08 155);color:var(--sage);font-size:12.5px;font-weight:700;">Together</span>
@@ -227,7 +287,8 @@
       </div>
 
       <!-- Row 4 -->
-      <div style="display:grid;grid-template-columns:1fr 1fr 110px 70px 120px 36px;gap:12px;align-items:center;background:#fff;border-radius:var(--r-sm);padding:14px 16px;box-shadow:var(--shadow);border:1.5px solid var(--border);">
+      <div style="display:grid;grid-template-columns:1fr 1fr 110px 70px 120px 36px;gap:12px;align-items:center;background:#fff;border-radius:var(--r-sm);padding:14px 16px;box-shadow:var(--shadow);border:1.5px solid oklch(78% 0.14 75);position:relative;">
+        <span style="position:absolute;left:-9px;top:-9px;background:oklch(78% 0.14 75);color:#fff;border-radius:50%;width:18px;height:18px;display:flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:700;box-shadow:0 1px 3px rgba(0,0,0,0.2);">4</span>
         <select style="padding:8px 10px;border-radius:var(--r-sm);border:1.5px solid var(--border);font-size:13.5px;color:var(--text);background:#fff;width:100%;"><option>George P.</option><option>Amara O.</option><option>Ben K.</option></select>
         <select style="padding:8px 10px;border-radius:var(--r-sm);border:1.5px solid var(--border);font-size:13.5px;color:var(--text);background:#fff;width:100%;"><option>Amara O.</option><option>Daniel S.</option><option>Emma T.</option></select>
         <span style="display:inline-flex;align-items:center;justify-content:center;padding:5px 12px;border-radius:20px;background:oklch(93% 0.06 25);color:oklch(52% 0.12 25);font-size:12.5px;font-weight:700;">Separate</span>
@@ -239,11 +300,13 @@
       </div>
 
       <!-- Add constraint button -->
-      <button style="display:flex;align-items:center;gap:8px;padding:12px 16px;background:none;border:2px dashed var(--border);border-radius:var(--r-sm);color:var(--teal);font-weight:600;font-size:13.5px;width:100%;margin-top:4px;">
+      <button onClick="{{ openAddConstraint }}" style="display:flex;align-items:center;gap:8px;padding:12px 16px;background:none;border:2px dashed var(--border);border-radius:var(--r-sm);color:var(--teal);font-weight:600;font-size:13.5px;width:100%;margin-top:4px;">
         <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M7.5 2v11M2 7.5h11" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path></svg>
         Add constraint
       </button>
     </div>
+
+    </sc-if>
   </main>
 </sc-if>
 
@@ -318,6 +381,27 @@
             </div>
           </div>
         </div>
+        <!-- Boy/girl balance -->
+        <div>
+          <div style="font-size:11.5px;font-weight:700;color:var(--text3);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px;">Boy / girl balance</div>
+          <div style="display:flex;flex-direction:column;gap:7px;">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span style="font-size:12px;color:var(--text2);font-weight:600;width:48px;">Class A</span>
+              <div style="flex:1;background:var(--bg2);border-radius:4px;height:10px;overflow:hidden;display:flex;"><div style="width:50%;height:100%;background:var(--teal);"></div><div style="width:50%;height:100%;background:var(--sage);"></div></div>
+              <span style="font-size:11px;color:var(--text3);width:44px;text-align:right;">5B / 5G</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span style="font-size:12px;color:var(--text2);font-weight:600;width:48px;">Class B</span>
+              <div style="flex:1;background:var(--bg2);border-radius:4px;height:10px;overflow:hidden;display:flex;"><div style="width:55.5%;height:100%;background:var(--teal);"></div><div style="width:44.5%;height:100%;background:var(--sage);"></div></div>
+              <span style="font-size:11px;color:var(--text3);width:44px;text-align:right;">5B / 4G</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span style="font-size:12px;color:var(--text2);font-weight:600;width:48px;">Class C</span>
+              <div style="flex:1;background:var(--bg2);border-radius:4px;height:10px;overflow:hidden;display:flex;"><div style="width:44.5%;height:100%;background:var(--teal);"></div><div style="width:55.5%;height:100%;background:var(--sage);"></div></div>
+              <span style="font-size:11px;color:var(--text3);width:44px;text-align:right;">4B / 5G</span>
+            </div>
+          </div>
+        </div>
         <button onClick="{{ openRoster1 }}" style="background:var(--teal);color:#fff;font-weight:700;font-size:14px;padding:12px 0;border-radius:var(--r-sm);width:100%;margin-top:auto;box-shadow:0 2px 8px oklch(56% 0.11 188 / 0.25);">View class lists</button>
       </div>
 
@@ -358,6 +442,27 @@
               <span style="font-size:12px;color:var(--text2);font-weight:600;width:48px;">Class C</span>
               <div style="flex:1;background:var(--bg2);border-radius:4px;height:10px;overflow:hidden;"><div style="width:81%;height:100%;background:var(--sage);border-radius:4px;opacity:.7;"></div></div>
               <span style="font-size:12px;color:var(--text3);width:20px;">9</span>
+            </div>
+          </div>
+        </div>
+        <!-- Boy/girl balance -->
+        <div>
+          <div style="font-size:11.5px;font-weight:700;color:var(--text3);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px;">Boy / girl balance</div>
+          <div style="display:flex;flex-direction:column;gap:7px;">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span style="font-size:12px;color:var(--text2);font-weight:600;width:48px;">Class A</span>
+              <div style="flex:1;background:var(--bg2);border-radius:4px;height:10px;overflow:hidden;display:flex;"><div style="width:64%;height:100%;background:var(--teal);"></div><div style="width:36%;height:100%;background:var(--sage);"></div></div>
+              <span style="font-size:11px;color:var(--text3);width:44px;text-align:right;">7B / 4G</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span style="font-size:12px;color:var(--text2);font-weight:600;width:48px;">Class B</span>
+              <div style="flex:1;background:var(--bg2);border-radius:4px;height:10px;overflow:hidden;display:flex;"><div style="width:62.5%;height:100%;background:var(--teal);"></div><div style="width:37.5%;height:100%;background:var(--sage);"></div></div>
+              <span style="font-size:11px;color:var(--text3);width:44px;text-align:right;">5B / 3G</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span style="font-size:12px;color:var(--text2);font-weight:600;width:48px;">Class C</span>
+              <div style="flex:1;background:var(--bg2);border-radius:4px;height:10px;overflow:hidden;display:flex;"><div style="width:44.5%;height:100%;background:var(--teal);"></div><div style="width:55.5%;height:100%;background:var(--sage);"></div></div>
+              <span style="font-size:11px;color:var(--text3);width:44px;text-align:right;">4B / 5G</span>
             </div>
           </div>
         </div>
@@ -404,14 +509,168 @@
             </div>
           </div>
         </div>
+        <!-- Boy/girl balance -->
+        <div>
+          <div style="font-size:11.5px;font-weight:700;color:var(--text3);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px;">Boy / girl balance</div>
+          <div style="display:flex;flex-direction:column;gap:7px;">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span style="font-size:12px;color:var(--text2);font-weight:600;width:48px;">Class A</span>
+              <div style="flex:1;background:var(--bg2);border-radius:4px;height:10px;overflow:hidden;display:flex;"><div style="width:67%;height:100%;background:var(--teal);"></div><div style="width:33%;height:100%;background:var(--sage);"></div></div>
+              <span style="font-size:11px;color:var(--text3);width:44px;text-align:right;">8B / 4G</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span style="font-size:12px;color:var(--text2);font-weight:600;width:48px;">Class B</span>
+              <div style="flex:1;background:var(--bg2);border-radius:4px;height:10px;overflow:hidden;display:flex;"><div style="width:57%;height:100%;background:var(--teal);"></div><div style="width:43%;height:100%;background:var(--sage);"></div></div>
+              <span style="font-size:11px;color:var(--text3);width:44px;text-align:right;">4B / 3G</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span style="font-size:12px;color:var(--text2);font-weight:600;width:48px;">Class C</span>
+              <div style="flex:1;background:var(--bg2);border-radius:4px;height:10px;overflow:hidden;display:flex;"><div style="width:44.5%;height:100%;background:var(--teal);"></div><div style="width:55.5%;height:100%;background:var(--sage);"></div></div>
+              <span style="font-size:11px;color:var(--text3);width:44px;text-align:right;">4B / 5G</span>
+            </div>
+          </div>
+        </div>
         <button onClick="{{ openRoster3 }}" style="background:var(--bg2);color:var(--teal-dark);font-weight:700;font-size:14px;padding:12px 0;border-radius:var(--r-sm);width:100%;margin-top:auto;border:1.5px solid var(--border);">View class lists</button>
       </div>
 
     </div>
 
+    <div style="display:flex;align-items:center;justify-content:center;gap:16px;margin-top:16px;">
+      <span style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text3);"><span style="width:10px;height:10px;border-radius:2px;background:var(--teal);display:inline-block;"></span>Boys</span>
+      <span style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text3);"><span style="width:10px;height:10px;border-radius:2px;background:var(--sage);display:inline-block;"></span>Girls</span>
+    </div>
+
     <!-- Mobile hint -->
     <p style="font-size:12px;color:var(--text3);margin-top:18px;text-align:center;">On a small screen? Cards stack so you can compare one at a time.</p>
   </main>
+</sc-if>
+
+<!-- ADD STUDENT MODAL -->
+<sc-if value="{{ isAddStudentOpen }}" hint-placeholder-val="{{ false }}">
+  <div onClick="{{ closeAddStudent }}" style="position:fixed;inset:0;background:oklch(20% 0.02 85 / 0.45);z-index:210;display:flex;align-items:center;justify-content:center;padding:24px;">
+    <div onClick="{{ stopPropagation }}" style="background:#fff;border-radius:var(--r);box-shadow:var(--shadow-md);max-width:400px;width:100%;padding:26px;">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;">
+        <div style="font-size:18px;font-weight:800;color:var(--text);letter-spacing:-0.3px;">Add student</div>
+        <button onClick="{{ closeAddStudent }}" style="background:var(--bg2);border-radius:8px;width:28px;height:28px;color:var(--text3);font-size:15px;font-weight:700;flex-shrink:0;">✕</button>
+      </div>
+      <label style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;">Full name</label>
+      <input value="{{ addStudentDraft }}" onChange="{{ setAddStudentDraft }}" onKeyDown="{{ addStudentKeyDown }}" placeholder="e.g. Leo M." style="width:100%;margin-top:6px;padding:10px 12px;border-radius:var(--r-sm);border:1.5px solid var(--border);font-size:13.5px;color:var(--text);background:#fff;">
+      <button onClick="{{ confirmAddStudent }}" style="background:var(--teal);color:#fff;font-weight:700;font-size:14px;padding:12px 0;border-radius:var(--r-sm);width:100%;margin-top:18px;box-shadow:0 2px 8px oklch(56% 0.11 188 / 0.3);">Add to roster</button>
+    </div>
+  </div>
+</sc-if>
+
+<!-- ADD CONSTRAINT MODAL -->
+<sc-if value="{{ isAddConstraintOpen }}" hint-placeholder-val="{{ false }}">
+  <div onClick="{{ closeAddConstraint }}" style="position:fixed;inset:0;background:oklch(20% 0.02 85 / 0.45);z-index:210;display:flex;align-items:center;justify-content:center;padding:24px;">
+    <div onClick="{{ stopPropagation }}" style="background:#fff;border-radius:var(--r);box-shadow:var(--shadow-md);max-width:440px;width:100%;padding:26px;">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;">
+        <div style="font-size:18px;font-weight:800;color:var(--text);letter-spacing:-0.3px;">Add constraint</div>
+        <button onClick="{{ closeAddConstraint }}" style="background:var(--bg2);border-radius:8px;width:28px;height:28px;color:var(--text3);font-size:15px;font-weight:700;flex-shrink:0;">✕</button>
+      </div>
+      <div style="display:flex;gap:10px;">
+        <div style="flex:1;">
+          <label style="font-size:11.5px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;">Student A</label>
+          <select value="{{ newConstraintA }}" onChange="{{ setNewConstraintA }}" style="width:100%;margin-top:6px;padding:8px 10px;border-radius:var(--r-sm);border:1.5px solid var(--border);font-size:13px;color:var(--text);background:#fff;">
+            <sc-for list="{{ cohortStudents }}" as="s" hint-placeholder-count="6">
+              <option value="{{ s }}">{{ s }}</option>
+            </sc-for>
+          </select>
+        </div>
+        <div style="flex:1;">
+          <label style="font-size:11.5px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;">Student B</label>
+          <select value="{{ newConstraintB }}" onChange="{{ setNewConstraintB }}" style="width:100%;margin-top:6px;padding:8px 10px;border-radius:var(--r-sm);border:1.5px solid var(--border);font-size:13px;color:var(--text);background:#fff;">
+            <sc-for list="{{ cohortStudents }}" as="s2" hint-placeholder-count="6">
+              <option value="{{ s2 }}">{{ s2 }}</option>
+            </sc-for>
+          </select>
+        </div>
+      </div>
+      <div style="margin-top:16px;">
+        <label style="font-size:11.5px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;">Type</label>
+        <div style="display:flex;gap:8px;margin-top:6px;">
+          <button onClick="{{ setTypeTogether }}" style="flex:1;padding:9px 0;border-radius:8px;font-size:13px;font-weight:700;background:{{ togetherBg }};color:{{ togetherColor }};">Together</button>
+          <button onClick="{{ setTypeSeparate }}" style="flex:1;padding:9px 0;border-radius:8px;font-size:13px;font-weight:700;background:{{ separateBg }};color:{{ separateColor }};">Separate</button>
+        </div>
+      </div>
+      <label style="display:flex;align-items:center;gap:10px;margin-top:16px;cursor:pointer;">
+        <input type="checkbox" checked="{{ newConstraintHard }}" onChange="{{ toggleNewConstraintHard }}">
+        <span style="font-size:13px;color:var(--text2);">Hard constraint (must be satisfied)</span>
+      </label>
+      <div style="margin-top:14px;">
+        <label style="font-size:11.5px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;">Weight: {{ newConstraintWeight }}</label>
+        <input type="range" min="1" max="10" value="{{ newConstraintWeight }}" onChange="{{ setNewConstraintWeight }}" style="width:100%;margin-top:6px;">
+      </div>
+      <button onClick="{{ confirmAddConstraint }}" style="background:var(--teal);color:#fff;font-weight:700;font-size:14px;padding:12px 0;border-radius:var(--r-sm);width:100%;margin-top:20px;box-shadow:0 2px 8px oklch(56% 0.11 188 / 0.3);">Add constraint</button>
+    </div>
+  </div>
+</sc-if>
+
+<!-- NEW COHORT MODAL -->
+<sc-if value="{{ isNewCohortOpen }}" hint-placeholder-val="{{ false }}">
+  <div onClick="{{ closeNewCohort }}" style="position:fixed;inset:0;background:oklch(20% 0.02 85 / 0.45);z-index:210;display:flex;align-items:center;justify-content:center;padding:24px;">
+    <div onClick="{{ stopPropagation }}" style="background:#fff;border-radius:var(--r);box-shadow:var(--shadow-md);max-width:560px;width:100%;max-height:88vh;overflow-y:auto;padding:28px;">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:4px;gap:8px;">
+        <div>
+          <div style="font-size:19px;font-weight:800;color:var(--text);letter-spacing:-0.3px;">New cohort</div>
+          <p style="font-size:12.5px;color:var(--text3);margin-top:3px;">Bring in your student list, with or without grouping preferences.</p>
+        </div>
+        <button onClick="{{ closeNewCohort }}" style="background:var(--bg2);border-radius:8px;width:28px;height:28px;color:var(--text3);font-size:15px;font-weight:700;flex-shrink:0;">✕</button>
+      </div>
+
+      <div style="margin-top:20px;">
+        <label style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;">Cohort name</label>
+        <input value="{{ newCohortName }}" onChange="{{ setNewCohortName }}" placeholder="e.g. 4th Grade 2027" style="width:100%;margin-top:6px;padding:10px 12px;border-radius:var(--r-sm);border:1.5px solid var(--border);font-size:13.5px;color:var(--text);background:#fff;">
+      </div>
+
+      <!-- Source mode toggle -->
+      <div style="display:flex;gap:8px;margin-top:20px;background:var(--bg2);border-radius:var(--r-sm);padding:4px;">
+        <button onClick="{{ setModeUpload }}" style="flex:1;padding:9px 0;border-radius:8px;font-size:13px;font-weight:700;background:{{ uploadModeBg }};color:{{ uploadModeColor }};">Upload spreadsheet</button>
+        <button onClick="{{ setModePaste }}" style="flex:1;padding:9px 0;border-radius:8px;font-size:13px;font-weight:700;background:{{ pasteModeBg }};color:{{ pasteModeColor }};">Paste list</button>
+      </div>
+
+      <!-- Upload panel -->
+      <sc-if value="{{ isUploadMode }}" hint-placeholder-val="{{ true }}">
+        <label style="display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;border:2px dashed var(--border);border-radius:var(--r-sm);padding:28px 16px;margin-top:16px;cursor:pointer;background:var(--bg2);">
+          <svg width="26" height="26" viewBox="0 0 26 26" fill="none"><path d="M13 4v13M8 12l5-5 5 5M5 20h16" stroke="var(--teal)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+          <span style="font-size:13px;font-weight:700;color:var(--text);">{{ newCohortFileName }}</span>
+          <span style="font-size:11.5px;color:var(--text3);">.xlsx or .csv — drop here or click to browse</span>
+          <input type="file" accept=".xlsx,.xls,.csv" onChange="{{ handleFileChosen }}" style="display:none;">
+        </label>
+      </sc-if>
+
+      <!-- Paste panel -->
+      <sc-if value="{{ isPasteMode }}" hint-placeholder-val="{{ false }}">
+        <textarea value="{{ newCohortPasteText }}" onChange="{{ setNewCohortPasteText }}" placeholder="{{ pastePlaceholder }}" style="width:100%;height:130px;margin-top:16px;padding:12px;border-radius:var(--r-sm);border:1.5px solid var(--border);font-size:12.5px;color:var(--text);background:#fff;resize:vertical;font-family:inherit;"></textarea>
+      </sc-if>
+
+      <!-- Preferences toggle -->
+      <label style="display:flex;align-items:center;gap:10px;margin-top:16px;cursor:pointer;">
+        <input type="checkbox" checked="{{ newCohortHasPrefs }}" onChange="{{ toggleHasPrefs }}">
+        <span style="font-size:13px;color:var(--text2);">List includes grouping preferences (keep together / separate)</span>
+      </label>
+      <p style="font-size:11.5px;color:var(--text3);margin-top:6px;">{{ prefsHelpText }}</p>
+
+      <!-- Gender balance toggle -->
+      <label style="display:flex;align-items:center;gap:10px;margin-top:12px;cursor:pointer;">
+        <input type="checkbox" checked="{{ newCohortBalanceGender }}" onChange="{{ toggleBalanceGender }}">
+        <span style="font-size:13px;color:var(--text2);">Prioritize a balanced mix of boys and girls per class</span>
+      </label>
+      <p style="font-size:11.5px;color:var(--text3);margin-top:6px;">Added as a soft constraint the solver weighs alongside your other preferences.</p>
+
+      <div style="margin-top:18px;">
+        <label style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;">Number of classes</label>
+        <div style="display:flex;align-items:center;gap:14px;margin-top:8px;">
+          <button onClick="{{ decClassCount }}" style="width:32px;height:32px;border-radius:8px;background:var(--bg2);color:var(--text2);font-size:16px;font-weight:700;flex-shrink:0;">−</button>
+          <span style="font-size:16px;font-weight:800;color:var(--text);min-width:20px;text-align:center;">{{ newCohortClassCount }}</span>
+          <button onClick="{{ incClassCount }}" style="width:32px;height:32px;border-radius:8px;background:var(--bg2);color:var(--text2);font-size:16px;font-weight:700;flex-shrink:0;">+</button>
+          <span style="font-size:11.5px;color:var(--text3);">groups the solver will split students into</span>
+        </div>
+      </div>
+
+      <button onClick="{{ createCohort }}" style="background:var(--teal);color:#fff;font-weight:700;font-size:14px;padding:12px 0;border-radius:var(--r-sm);width:100%;margin-top:22px;box-shadow:0 2px 8px oklch(56% 0.11 188 / 0.3);">Create cohort</button>
+    </div>
+  </div>
 </sc-if>
 
 <!-- CLASS ROSTER MODAL -->
@@ -447,76 +706,73 @@
       </div>
     </sc-if>
 
-    <!-- Expanded view: table + graph -->
-    <sc-if value="{{ isExpandedRoster }}" hint-placeholder-val="{{ false }}">
-      <div onClick="{{ stopPropagation }}" style="background:#fff;border-radius:var(--r);box-shadow:var(--shadow-md);max-width:960px;width:100%;max-height:88vh;overflow-y:auto;padding:28px;">
-        <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:4px;gap:8px;">
-          <div>
-            <div style="font-size:19px;font-weight:800;color:var(--text);letter-spacing:-0.3px;">{{ rosterLabel }} — full report</div>
-            <p style="font-size:12.5px;color:var(--text3);margin-top:3px;">Roster table, export, and a preference map colored by class group.</p>
-          </div>
-          <div style="display:flex;gap:8px;flex-shrink:0;">
-            <button onClick="{{ collapseRoster }}" style="background:var(--bg2);color:var(--text2);border-radius:8px;padding:0 12px;height:28px;font-size:12.5px;font-weight:700;">Collapse</button>
-            <button onClick="{{ closeRoster }}" style="background:var(--bg2);border-radius:8px;width:28px;height:28px;color:var(--text3);font-size:15px;font-weight:700;">✕</button>
-          </div>
-        </div>
-
-        <div style="display:flex;gap:22px;margin-top:20px;flex-wrap:wrap;">
-
-          <!-- Table -->
-          <div style="flex:1 1 320px;min-width:280px;">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-              <span style="font-size:11.5px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;">Roster table</span>
-              <button onClick="{{ downloadXlsx }}" style="display:flex;align-items:center;gap:6px;background:oklch(52% 0.13 148);color:#fff;font-size:12px;font-weight:700;padding:6px 12px;border-radius:8px;">
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1.5" y="1.5" width="11" height="11" rx="1.5" fill="white" fill-opacity=".15"/><path d="M4 4.5l2.5 5M6.5 4.5L4 9.5M8 4.5h2M8 7h1.6M8 9.5h2" stroke="white" stroke-width="1" stroke-linecap="round"/></svg>
-                Download .xlsx
-              </button>
-            </div>
-            <div style="border:1.5px solid var(--border);border-radius:var(--r-sm);overflow:hidden;">
-              <div style="display:grid;grid-template-columns:1fr 1.4fr;background:var(--bg2);padding:8px 12px;">
-                <span style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;">Class</span>
-                <span style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;">Student</span>
-              </div>
-              <sc-for list="{{ rosterTableRows }}" as="row" hint-placeholder-count="6">
-                <div style="display:grid;grid-template-columns:1fr 1.4fr;padding:7px 12px;border-top:1px solid var(--border);align-items:center;">
-                  <span style="font-size:12.5px;font-weight:600;color:{{ row.color }};">{{ row.className }}</span>
-                  <span style="font-size:12.5px;color:var(--text);">{{ row.student }}</span>
-                </div>
-              </sc-for>
-            </div>
-          </div>
-
-          <!-- Graph -->
-          <div style="flex:1 1 380px;min-width:300px;">
-            <span style="font-size:11.5px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;">Preference map</span>
-            <div style="border:1.5px solid var(--border);border-radius:var(--r-sm);margin-top:10px;background:var(--bg2);position:relative;">
-              <svg viewBox="0 0 540 420" width="100%" style="display:block;">
-                <sc-for list="{{ graphEdges }}" as="e" hint-placeholder-count="4">
-                  <line x1="{{ e.x1 }}" y1="{{ e.y1 }}" x2="{{ e.x2 }}" y2="{{ e.y2 }}" stroke="oklch(55% 0.02 85)" stroke-width="1.3" opacity="0.4" />
-                </sc-for>
-                <sc-for list="{{ graphNodes }}" as="n" hint-placeholder-count="20">
-                  <circle cx="{{ n.x }}" cy="{{ n.y }}" r="14" fill="{{ n.color }}" stroke="white" stroke-width="2" />
-                </sc-for>
-              </svg>
-              <sc-for list="{{ graphNodes }}" as="n2" hint-placeholder-count="20">
-                <div style="position:absolute;left:{{ n2.leftPct }}%;top:{{ n2.topPct }}%;transform:translate(-50%,-50%);font-size:10px;font-weight:700;color:white;pointer-events:none;line-height:1;">{{ n2.initials }}</div>
-              </sc-for>
-            </div>
-            <div style="display:flex;gap:14px;margin-top:10px;flex-wrap:wrap;">
-              <sc-for list="{{ graphLegend }}" as="leg" hint-placeholder-count="3">
-                <span style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2);font-weight:500;">
-                  <span style="width:9px;height:9px;border-radius:50%;background:{{ leg.color }};display:inline-block;"></span>{{ leg.name }}
-                </span>
-              </sc-for>
-              <span style="font-size:11.5px;color:var(--text3);">— lines show paired preferences</span>
-            </div>
-          </div>
-
-        </div>
-      </div>
-    </sc-if>
-
   </div>
+</sc-if>
+
+<!-- SCREEN: ROSTER REPORT (full page) -->
+<sc-if value="{{ isRosterReport }}" hint-placeholder-val="{{ false }}">
+  <main style="max-width:1240px;margin:0 auto;padding:32px 24px 80px;">
+    <!-- Breadcrumb -->
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:24px;">
+      <button onClick="{{ backToSolutions }}" style="background:none;font-size:13px;color:var(--teal);font-weight:600;">← Compare solutions</button>
+      <span style="color:var(--text3);font-size:13px;">/</span>
+      <span style="font-size:13px;color:var(--text2);font-weight:500;">{{ rosterLabel }} — full report</span>
+    </div>
+
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:28px;flex-wrap:wrap;gap:12px;">
+      <div>
+        <h1 style="font-size:24px;font-weight:800;color:var(--text);letter-spacing:-0.4px;">{{ rosterLabel }} — full report</h1>
+        <p style="font-size:13.5px;color:var(--text3);margin-top:3px;">Class lists, export, and a preference map colored by class group.</p>
+      </div>
+      <button onClick="{{ downloadXlsx }}" style="display:flex;align-items:center;gap:6px;background:oklch(52% 0.13 148);color:#fff;font-size:13px;font-weight:700;padding:9px 16px;border-radius:8px;flex-shrink:0;">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1.5" y="1.5" width="11" height="11" rx="1.5" fill="white" fill-opacity=".15"/><path d="M4 4.5l2.5 5M6.5 4.5L4 9.5M8 4.5h2M8 7h1.6M8 9.5h2" stroke="white" stroke-width="1" stroke-linecap="round"/></svg>
+        Download .xlsx
+      </button>
+    </div>
+
+    <!-- Row 1: class lists side by side -->
+    <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:18px;margin-bottom:28px;">
+      <sc-for list="{{ rosterClasses }}" as="cls" hint-placeholder-count="3">
+        <div style="background:#fff;border:1.5px solid var(--border);border-top:4px solid {{ cls.color }};border-radius:var(--r);box-shadow:var(--shadow-sm);padding:18px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+            <span style="display:flex;align-items:center;gap:8px;font-size:15px;font-weight:800;color:var(--text);"><span style="width:10px;height:10px;border-radius:50%;background:{{ cls.color }};display:inline-block;"></span>{{ cls.name }}</span>
+            <span style="font-size:12px;font-weight:600;color:var(--text3);">{{ cls.count }} students</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <sc-for list="{{ cls.students }}" as="student" hint-placeholder-count="10">
+              <div style="font-size:13px;color:var(--text2);padding:6px 10px;background:var(--bg2);border-radius:7px;">{{ student }}</div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+
+    <!-- Row 2: graph -->
+    <div style="background:#fff;border:1.5px solid var(--border);border-radius:var(--r);box-shadow:var(--shadow-sm);padding:20px;">
+      <span style="font-size:11.5px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;">Preference map</span>
+      <div style="border:1.5px solid var(--border);border-radius:var(--r-sm);margin-top:10px;background:var(--bg2);position:relative;max-width:640px;margin-left:auto;margin-right:auto;">
+        <svg viewBox="0 0 540 420" width="100%" style="display:block;aspect-ratio:540/420;">
+          <sc-for list="{{ graphEdges }}" as="e" hint-placeholder-count="4">
+            <line x1="{{ e.x1 }}" y1="{{ e.y1 }}" x2="{{ e.x2 }}" y2="{{ e.y2 }}" stroke="oklch(55% 0.02 85)" stroke-width="1.3" opacity="0.4" />
+          </sc-for>
+          <sc-for list="{{ graphNodes }}" as="n" hint-placeholder-count="20">
+            <circle cx="{{ n.x }}" cy="{{ n.y }}" r="14" fill="{{ n.color }}" stroke="white" stroke-width="2" />
+          </sc-for>
+        </svg>
+        <sc-for list="{{ graphNodes }}" as="n2" hint-placeholder-count="20">
+          <div style="position:absolute;left:{{ n2.leftPct }}%;top:{{ n2.topPct }}%;transform:translate(-50%,-50%);font-size:10px;font-weight:700;color:white;pointer-events:none;line-height:1;">{{ n2.initials }}</div>
+        </sc-for>
+      </div>
+      <div style="display:flex;gap:14px;margin-top:10px;flex-wrap:wrap;">
+        <sc-for list="{{ graphLegend }}" as="leg" hint-placeholder-count="3">
+          <span style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2);font-weight:500;">
+            <span style="width:9px;height:9px;border-radius:50%;background:{{ leg.color }};display:inline-block;"></span>{{ leg.name }}
+          </span>
+        </sc-for>
+        <span style="font-size:11.5px;color:var(--text3);">— lines show paired preferences</span>
+      </div>
+    </div>
+  </main>
 </sc-if>
 
 </x-dc>
@@ -524,7 +780,9 @@
   &quot;$preview&quot;: { &quot;width&quot;: 1200, &quot;height&quot;: 900 }
 }">
 class Component extends DCLogic {
-  state = { screen: 'dashboard', openRoster: null, rosterView: 'compact' };
+  state = { whyExpanded: false, newCohortBalanceGender: false, screen: 'dashboard', openRoster: null, rosterView: 'compact', aiDraft: '', aiThread: [], constraintTab: 'constraints', cohortStudents: null, isNewCohortOpen: false, newCohortName: '', newCohortMode: 'upload', newCohortFileName: 'No file chosen', newCohortPasteText: '', newCohortHasPrefs: false, newCohortClassCount: 3, isAddStudentOpen: false, addStudentDraft: '', isAddConstraintOpen: false, newConstraintA: '', newConstraintB: '', newConstraintType: 'together', newConstraintHard: false, newConstraintWeight: 5 };
+
+  defaultCohortStudents = ['Amara O.', 'Ben K.', 'Chloe R.', 'Daniel S.', 'Emma T.', 'Fiona L.', 'George P.', 'Hina M.', 'Ivy N.', 'Jax D.', 'Kai L.', 'Liv S.', 'Milo R.', 'Nia B.', 'Omar T.', 'Priya K.', 'Quinn A.', 'Rosa V.', 'Theo C.', 'Uma J.', 'Vic H.', 'Wren F.', 'Xander M.', 'Yara D.', 'Zeke O.', 'Ada P.', 'Beau S.', 'Cleo W.'];
 
   classColors = ['oklch(56% 0.11 188)', 'oklch(60% 0.09 155)', 'oklch(55% 0.1 270)'];
 
@@ -570,6 +828,43 @@ class Component extends DCLogic {
     return { nodes, edges };
   }
 
+  sendAiMessage() {
+    const text = this.state.aiDraft.trim();
+    if (!text) return;
+    const reply = this.craftAiReply(text);
+    this.setState(s => ({
+      aiDraft: '',
+      aiThread: [...s.aiThread, { who: 'You', text, color: 'var(--text2)' }, { who: 'Assistant', text: reply, color: 'var(--teal-dark)' }],
+    }));
+  }
+
+  addStudent() {
+    const name = window.prompt('Student name (e.g. "Leo M.")');
+    if (!name || !name.trim()) return;
+    this.setState(s => ({ cohortStudents: [...(s.cohortStudents || this.defaultCohortStudents), name.trim()] }));
+  }
+
+  confirmAddStudent() {
+    const name = this.state.addStudentDraft.trim();
+    if (!name) return;
+    this.setState(s => ({ cohortStudents: [...(s.cohortStudents || this.defaultCohortStudents), name], isAddStudentOpen: false, addStudentDraft: '' }));
+  }
+
+  confirmAddConstraint() {
+    this.setState({ isAddConstraintOpen: false, newConstraintA: '', newConstraintB: '', newConstraintType: 'together', newConstraintHard: false, newConstraintWeight: 5 });
+  }
+
+  createCohort() {
+    this.setState({ isNewCohortOpen: false, newCohortName: '', newCohortFileName: 'No file chosen', newCohortPasteText: '', newCohortMode: 'upload', newCohortHasPrefs: false, newCohortBalanceGender: false, newCohortClassCount: 3, screen: 'constraints' });
+  }
+
+  craftAiReply(text) {
+    const t = text.toLowerCase();
+    if (t.includes('separate') || t.includes("don't") || t.includes('apart')) return 'Added a "separate" rule ✓';
+    if (t.includes('add') && (t.includes('student') || /[A-Z][a-z]+ [A-Z]\./.test(text))) return 'Student added to the roster ✓';
+    return 'Added a "keep together" rule ✓';
+  }
+
   downloadRosterXlsx(classes, label) {
     let csv = 'Class,Student\n';
     classes.forEach(cls => cls.students.forEach(s => { csv += cls.name + ',' + s + '\n'; }));
@@ -612,7 +907,7 @@ class Component extends DCLogic {
   };
 
   renderVals() {
-    const { screen, openRoster, rosterView } = this.state;
+    const { screen, openRoster, rosterView, aiDraft, aiThread, constraintTab, isNewCohortOpen, newCohortName, newCohortMode, newCohortFileName, newCohortPasteText, newCohortHasPrefs, newCohortClassCount, isAddStudentOpen, addStudentDraft, isAddConstraintOpen, newConstraintA, newConstraintB, newConstraintType, newConstraintHard, newConstraintWeight } = this.state;
     const active = openRoster ? this.rosters[openRoster] : null;
     const graph = active ? this.buildGraph(active.classes) : { nodes: [], edges: [] };
     const tableRows = active ? active.classes.flatMap((cls, ci) =>
@@ -623,16 +918,91 @@ class Component extends DCLogic {
       isDashboard:   screen === 'dashboard',
       isConstraints: screen === 'constraints',
       isSolutions:   screen === 'solutions',
+      isRosterReport: screen === 'roster-report',
       goHome:        () => this.setState({ screen: 'dashboard' }),
       openCohort:    () => this.setState({ screen: 'constraints' }),
       newCohort:     () => this.setState({ screen: 'constraints' }),
+      openNewCohort: () => this.setState({ isNewCohortOpen: true }),
+      closeNewCohort: () => this.setState({ isNewCohortOpen: false }),
+      isNewCohortOpen,
+      newCohortName,
+      setNewCohortName: (e) => this.setState({ newCohortName: e.target.value }),
+      isUploadMode: newCohortMode === 'upload',
+      isPasteMode: newCohortMode === 'paste',
+      setModeUpload: () => this.setState({ newCohortMode: 'upload' }),
+      setModePaste: () => this.setState({ newCohortMode: 'paste' }),
+      uploadModeBg: newCohortMode === 'upload' ? '#fff' : 'transparent',
+      uploadModeColor: newCohortMode === 'upload' ? 'var(--teal-dark)' : 'var(--text3)',
+      pasteModeBg: newCohortMode === 'paste' ? '#fff' : 'transparent',
+      pasteModeColor: newCohortMode === 'paste' ? 'var(--teal-dark)' : 'var(--text3)',
+      newCohortFileName,
+      handleFileChosen: (e) => this.setState({ newCohortFileName: (e.target.files && e.target.files[0]) ? e.target.files[0].name : 'No file chosen' }),
+      newCohortPasteText,
+      setNewCohortPasteText: (e) => this.setState({ newCohortPasteText: e.target.value }),
+      pastePlaceholder: newCohortHasPrefs ? 'Amara O., keep with Ben K.\nChloe R., separate from Daniel S.\n…' : 'Amara O.\nBen K.\nChloe R.\n…',
+      newCohortHasPrefs,
+      toggleHasPrefs: () => this.setState(s => ({ newCohortHasPrefs: !s.newCohortHasPrefs })),
+      newCohortBalanceGender: this.state.newCohortBalanceGender,
+      toggleBalanceGender: () => this.setState(s => ({ newCohortBalanceGender: !s.newCohortBalanceGender })),
+      prefsHelpText: newCohortHasPrefs ? 'We\'ll parse each pair into a constraint you can review before solving.' : 'Just names — add grouping preferences later in the Constraint Editor.',
+      createCohort: () => this.createCohort(),
+      newCohortClassCount,
+      incClassCount: () => this.setState(s => ({ newCohortClassCount: Math.min(8, s.newCohortClassCount + 1) })),
+      decClassCount: () => this.setState(s => ({ newCohortClassCount: Math.max(2, s.newCohortClassCount - 1) })),
       goConstraints: () => this.setState({ screen: 'constraints' }),
       goSolutions:   () => this.setState({ screen: 'solutions' }),
-      isRosterOpen:  !!openRoster,
+      isRosterOpen:  !!openRoster && screen === 'solutions',
       isCompactRoster: rosterView === 'compact',
-      isExpandedRoster: rosterView === 'expanded',
+      isStudentsTab: constraintTab === 'students',
+      isConstraintsTab: constraintTab === 'constraints',
+      showStudentsTab: () => this.setState({ constraintTab: 'students' }),
+      showConstraintsTab: () => this.setState({ constraintTab: 'constraints' }),
+      studentsTabWeight: constraintTab === 'students' ? 700 : 600,
+      studentsTabColor: constraintTab === 'students' ? 'var(--teal)' : 'var(--text3)',
+      studentsTabBorder: constraintTab === 'students' ? 'var(--teal)' : 'transparent',
+      constraintsTabWeight: constraintTab === 'constraints' ? 700 : 600,
+      constraintsTabColor: constraintTab === 'constraints' ? 'var(--teal)' : 'var(--text3)',
+      constraintsTabBorder: constraintTab === 'constraints' ? 'var(--teal)' : 'transparent',
+      cohortStudents: this.state.cohortStudents || this.defaultCohortStudents,
+      addStudent: () => this.addStudent(),
+      isAddStudentOpen,
+      openAddStudent: () => this.setState({ isAddStudentOpen: true, addStudentDraft: '' }),
+      closeAddStudent: () => this.setState({ isAddStudentOpen: false }),
+      addStudentDraft,
+      setAddStudentDraft: (e) => this.setState({ addStudentDraft: e.target.value }),
+      addStudentKeyDown: (e) => { if (e.key === 'Enter') this.confirmAddStudent(); },
+      confirmAddStudent: () => this.confirmAddStudent(),
+      isAddConstraintOpen,
+      openAddConstraint: () => this.setState(s => {
+        const list = s.cohortStudents || this.defaultCohortStudents;
+        return { isAddConstraintOpen: true, newConstraintA: list[0] || '', newConstraintB: list[1] || '' };
+      }),
+      closeAddConstraint: () => this.setState({ isAddConstraintOpen: false }),
+      newConstraintA,
+      setNewConstraintA: (e) => this.setState({ newConstraintA: e.target.value }),
+      newConstraintB,
+      setNewConstraintB: (e) => this.setState({ newConstraintB: e.target.value }),
+      setTypeTogether: () => this.setState({ newConstraintType: 'together' }),
+      setTypeSeparate: () => this.setState({ newConstraintType: 'separate' }),
+      togetherBg: newConstraintType === 'together' ? 'var(--teal-light)' : 'var(--bg2)',
+      togetherColor: newConstraintType === 'together' ? 'var(--teal-dark)' : 'var(--text3)',
+      separateBg: newConstraintType === 'separate' ? 'oklch(93% 0.06 25)' : 'var(--bg2)',
+      separateColor: newConstraintType === 'separate' ? 'oklch(52% 0.12 25)' : 'var(--text3)',
+      newConstraintHard,
+      toggleNewConstraintHard: () => this.setState(s => ({ newConstraintHard: !s.newConstraintHard })),
+      newConstraintWeight,
+      setNewConstraintWeight: (e) => this.setState({ newConstraintWeight: +e.target.value }),
+      confirmAddConstraint: () => this.confirmAddConstraint(),
+      aiDraft, aiThread,
+      hasAiThread: aiThread.length > 0,
+      whyExpanded: this.state.whyExpanded,
+      whyLabel: this.state.whyExpanded ? 'Hide' : 'Why?',
+      toggleWhy: () => this.setState(s => ({ whyExpanded: !s.whyExpanded })),
+      setAiDraft: (e) => this.setState({ aiDraft: e.target.value }),
+      sendAiMessage: () => this.sendAiMessage(),
+      aiKeyDown: (e) => { if (e.key === 'Enter') this.sendAiMessage(); },
       rosterLabel:   active ? active.label : '',
-      rosterClasses: active ? active.classes : [],
+      rosterClasses: active ? active.classes.map((cls, ci) => ({ ...cls, color: this.classColors[ci % this.classColors.length] })) : [],
       rosterTableRows: tableRows,
       graphNodes: graph.nodes,
       graphEdges: graph.edges,
@@ -641,8 +1011,8 @@ class Component extends DCLogic {
       openRoster2:   () => this.setState({ openRoster: 'soft', rosterView: 'compact' }),
       openRoster3:   () => this.setState({ openRoster: 'diversity', rosterView: 'compact' }),
       closeRoster:   () => this.setState({ openRoster: null, rosterView: 'compact' }),
-      expandRoster:  () => this.setState({ rosterView: 'expanded' }),
-      collapseRoster: () => this.setState({ rosterView: 'compact' }),
+      expandRoster:  () => this.setState({ screen: 'roster-report' }),
+      backToSolutions: () => this.setState({ screen: 'solutions', openRoster: null, rosterView: 'compact' }),
       downloadXlsx:  () => active && this.downloadRosterXlsx(active.classes, active.label),
       stopPropagation: (e) => e.stopPropagation(),
     };

@@ -82,10 +82,15 @@ Sample cards: "4th Grade 2026" (28 students, Active, solved 2 days ago), "3rd Gr
   - Centered checkbox for "Hard" constraint.
   - Range slider (1–10) for weight.
   - Trash icon button (coral on hover).
-  - **Contradiction row is visually distinct:** amber border (`oklch(78% 0.14 75)`) + warm tinted background (`oklch(97% 0.04 85)`) instead of default white/gray border.
+  - **Contradiction row is visually distinct:** amber border (`oklch(78% 0.14 75)`) + warm tinted background (`oklch(97% 0.04 85)`) instead of default white/gray border, plus a small numbered circular badge (amber bg, white number, 18px) overlaid at the row's top-left corner. Every row involved in the same contradiction shares a badge number (row cross-referencing) so a teacher can visually trace which rules conflict.
 - "+ Add constraint" ghost button below rows: dashed 2px border, teal text, full width.
 
-Sample rows: Amara O. ↔ Ben K. (Together, Hard, weight 8, **contradiction**), Chloe R. ↔ Daniel S. (Separate, weight 5), Emma T. ↔ Fiona L. (Together, Hard, weight 9), George P. ↔ Amara O. (Separate, weight 3).
+**Contradiction explanation (in the warning banner):**
+- The banner has a "Why?" text-link button, right-aligned, toggling to "Hide" when expanded (13px/700, `--warn-text`, underlined).
+- Expanding reveals an inline panel below the banner's message row, separated by a `1px solid var(--warn-border)` top divider: a plain-language sentence naming the two conflicting rules and why they can't both hold (e.g. "Row 1 requires A and B Together (hard). Row 4 requires C and A Separate (hard). Since C and B are already in the same class, both can't be satisfied."), followed by small numbered pill chips (one per conflicting rule, matching the row badge numbers/colors) restating each rule compactly.
+- This inline explanation is paired with the row badges described above — expanding "Why?" and glancing at the badged rows are two views of the same cross-reference, so a teacher can use either the banner text or scan the rows to find the conflict.
+
+Sample rows: Amara O. ↔ Ben K. (Together, Hard, weight 8, **contradiction, badge 1**), Chloe R. ↔ Daniel S. (Separate, weight 5), Emma T. ↔ Fiona L. (Together, Hard, weight 9), George P. ↔ Amara O. (Separate, weight 3, **contradiction, badge 4**).
 
 ### 3. Solution Comparison (`/cohorts/:id?tab=solutions`)
 **Purpose:** Compare solver outputs and pick one to finalize.
@@ -99,6 +104,7 @@ Sample rows: Amara O. ↔ Ben K. (Together, Hard, weight 8, **contradiction**), 
 - Label (18px/800) + score row: big number (28px/800, accent-colored) + "/ 100 score" (13px, `--text3`).
 - Two stat chips side by side (flex, 10px gap): "Soft violations" and "Hard violations", each hue-tinted bg, 20px/800 number.
 - Bar chart section: "Class sizes" caps label (11.5px/700 uppercase), then 3 rows — class label (12px/600, 48px wide) + horizontal bar (10px tall, `--bg2` track, accent fill, rounded 4px, width % proportional to size) + numeric value (12px).
+- Boy/girl balance section (same pattern, below class sizes): "Boy / girl balance" caps label, then 3 rows — class label + a segmented horizontal bar (10px tall, rounded 4px, two segments: teal = boys, sage = girls, widths proportional to split) + a compact "5B / 4G" value label (11px, right-aligned). A small legend ("Boys" teal swatch, "Girls" sage swatch) sits centered below the whole card row, once for the section.
 - Full-width "View class lists" button at bottom (`margin-top: auto` to pin to card bottom).
 
 **Card 1 — "Balanced sizes" (BEST):** `2px solid teal` border, elevated shadow, teal "✦ BEST" ribbon badge top-right corner. Score 94, soft violations 2, hard violations 0. Class sizes: 10/9/9. Primary teal "View class lists" button.
@@ -108,6 +114,9 @@ Sample rows: Amara O. ↔ Ben K. (Together, Hard, weight 8, **contradiction**), 
 **Card 3 — "Diversity mix":** default border/shadow. Score 81 (lavender), soft violations 6, hard 0. Class sizes: 12/7/9. Ghost-style button.
 
 Small helper caption below cards (12px, centered, `--text3`): "On a small screen? Cards stack so you can compare one at a time."
+
+## New Cohort Modal — Gender Balance Toggle
+Below the existing "List includes grouping preferences" checkbox, a second checkbox: "Prioritize a balanced mix of boys and girls per class" with helper caption "Added as a soft constraint the solver weighs alongside your other preferences." When checked, the solver should treat gender balance as an additional soft constraint (same weighting mechanism as Together/Separate preferences) — this is what drives the boy/girl balance bars shown on the Solutions screen.
 
 ## Interactions & Behavior
 - Nav logo click → navigate to Cohort Dashboard.
@@ -122,7 +131,9 @@ Small helper caption below cards (12px, centered, `--text3`): "On a small screen
 - `currentScreen`: 'dashboard' | 'constraints' | 'solutions' (or real route state)
 - `selectedCohortId`
 - Per-cohort: `students[]`, `constraints[]` (each with studentA, studentB, type: 'together'|'separate', isHard: bool, weight: 1-10), `solutions[]` (each with label, score, softViolations, hardViolations, classSizes[])
-- Constraint contradiction detection: flag any constraint set that is logically unsatisfiable (e.g. A-together-B AND A-separate-B), surface via the warning banner + row highlight — this logic should be computed, not hardcoded per the prototype.
+- Constraint contradiction detection: flag any constraint set that is logically unsatisfiable (e.g. A-together-B AND A-separate-B), surface via the warning banner + row highlight — this logic should be computed, not hardcoded per the prototype. The banner's expandable "Why?" explanation and the row badge numbers should be derived from the same computed conflict-group data (a list of conflicting rule-id groups), not authored separately.
+- New cohort creation: `balanceGender: bool` flag per cohort, feeding the solver's soft-constraint set.
+- Solutions: each solution's `classSizes[]` should also carry a `genderSplit[]` (boys/girls count per class) so the boy/girl balance bars can render from real solver output.
 
 ## 4. Class Roster Modal (opened from "View class lists" on any Solution card)
 **Purpose:** Let a teacher inspect and export the actual class lists behind a given solution, and see a preference relationship map.
@@ -167,3 +178,4 @@ No external images. Inline SVG logo mark (2×2 grid, teal), inline SVG icons (pe
 - `Kid s.dc.html` — full HTML reference for all screens and the roster modal (screen/modal state switching via local component state)
 - `design.md` — complete design token reference
 - `support.js` — internal runtime shim for the prototype tool; **not needed** in the production implementation, ignore it
+- `screenshots/` — reference captures: `dashboard.png`, `constraint-editor-contradiction.png` (Why? expanded), `solutions-gender-balance.png`, `new-cohort-modal.png`
