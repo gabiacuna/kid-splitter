@@ -1016,3 +1016,60 @@ input[type='range'] {
 .earlier-runs summary { cursor: pointer; font-weight: 700; color: var(--text2); font-size: 14px; }
 .earlier-run h4 { font-size: 13px; color: var(--text2); margin: 18px 0 10px; }
 @media (max-width: 640px) { .solution-cards { flex-direction: column; } }
+
+/* Class roster modal */
+.roster-overlay { background: oklch(20% 0.02 85 / 0.45); }
+.roster-modal {
+  max-width: 520px;
+  max-height: 88vh;
+  overflow-y: auto;
+  border-radius: 14px;
+  outline: none;
+}
+.roster-modal.expanded { max-width: 960px; }
+.roster-modal-header { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+.roster-modal-title { flex: 1; min-width: 0; font-size: 19px; font-weight: 800; letter-spacing: -0.2px; margin: 0; }
+.pill-btn {
+  display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0;
+  background: var(--teal-light); color: var(--teal-dark);
+  border: none; border-radius: 20px; padding: 6px 12px;
+  font: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
+}
+.pill-btn:hover { filter: brightness(0.97); }
+.roster-close {
+  flex-shrink: 0; width: 32px; height: 32px; border: none; border-radius: 50%;
+  background: transparent; color: var(--text2); font-size: 16px; cursor: pointer;
+}
+.roster-close:hover { background: var(--bg2); }
+.pill-btn:focus-visible, .roster-close:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+.roster-compact { display: flex; flex-direction: column; gap: 12px; }
+.roster-block { background: var(--bg2); border-radius: 8px; padding: 14px 16px; }
+.roster-block-head {
+  display: flex; justify-content: space-between; gap: 8px; margin: 0 0 10px;
+  font-size: 14px; font-weight: 700;
+}
+.roster-block-head span:last-child { font-weight: 500; color: var(--text2); font-size: 13px; }
+.chip-list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.name-chip { background: var(--teal-light); color: var(--teal-dark); border-radius: 20px; padding: 4px 12px; font-size: 13px; font-weight: 600; }
+.roster-expanded { display: flex; flex-wrap: wrap; gap: 22px; align-items: flex-start; }
+.roster-col { flex: 1 1 320px; min-width: 0; }
+.roster-table { border: 1.5px solid var(--border); border-radius: 8px; overflow: hidden; font-size: 13.5px; }
+.roster-table-head, .roster-table-row { display: grid; grid-template-columns: 1fr 1.4fr; gap: 8px; padding: 8px 14px; }
+.roster-table-head { background: var(--bg2); font-size: 11.5px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text3); }
+.roster-table-row { border-top: 1.5px solid var(--border); }
+.roster-table-class { font-weight: 700; color: var(--class-color); }
+.pref-map { position: relative; width: 100%; }
+.pref-map svg { display: block; width: 100%; height: auto; }
+.pref-initials {
+  position: absolute; transform: translate(-50%, -50%); text-align: center;
+  color: #fff; font-weight: 700; line-height: 1; pointer-events: none;
+}
+.pref-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 10px; font-size: 12.5px; color: var(--text2); }
+.pref-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.pref-legend i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.pref-legend-note { color: var(--text3); }
+.roster-fullpage { flex-basis: 100%; margin: 0; font-size: 13.5px; }
+@media (max-width: 640px) {
+  .roster-overlay { padding: 12px; }
+  .roster-modal { padding: 20px 16px; }
+}

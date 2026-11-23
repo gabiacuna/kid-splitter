@@ -7,6 +7,7 @@ import { validationKey } from '../lib/queryKeys';
 import { useToast } from '../components/Toast';
 import { MIN_CLASSES, MAX_CLASSES, classColor, classLabel } from '../lib/classes';
 import { VARIANTS, variantName, rankSolutions } from '../lib/solutions';
+import RosterModal from '../components/RosterModal';
 
 // Score accent by rank (not threshold), so three 90+ scores still read as ranked.
 const RANK_ACCENTS = [
@@ -72,6 +73,7 @@ function SolutionCard({ solution, rank, showGender, onDelete }: {
   const best = rank === 0;
   const accent = RANK_ACCENTS[Math.min(rank, RANK_ACCENTS.length - 1)];
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [showRoster, setShowRoster] = useState(false);
   return (
     <article className={`solution-card${best ? ' best' : ''}${solution.hard_violations > 0 ? ' has-violations' : ''}`}>
       {best && <div className="solution-best-badge">✦ BEST</div>}
@@ -97,9 +99,9 @@ function SolutionCard({ solution, rank, showGender, onDelete }: {
       <ClassSizeBars solution={solution} />
       {showGender && <GenderBars split={solution.gender_split} />}
       <div className="solution-actions">
-        <Link to={`/solutions/${solution.id}`} className={`btn ${best ? 'btn-primary' : 'btn-secondary'}`}>
+        <button type="button" className={`btn ${best ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setShowRoster(true)}>
           View class lists
-        </Link>
+        </button>
         {confirmDelete ? (
           <span className="solution-delete-confirm">
             Delete this option?{' '}
@@ -110,6 +112,7 @@ function SolutionCard({ solution, rank, showGender, onDelete }: {
           <button type="button" className="link-button muted" onClick={() => setConfirmDelete(true)}>Delete</button>
         )}
       </div>
+      {showRoster && <RosterModal solution={solution} onClose={() => setShowRoster(false)} />}
     </article>
   );
 }

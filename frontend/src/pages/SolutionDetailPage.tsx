@@ -8,6 +8,7 @@ import ShareModal from '../components/ShareModal';
 import { useToast } from '../components/Toast';
 import { classColorStyle, classLabel } from '../lib/classes';
 import { variantName } from '../lib/solutions';
+import { groupByClass } from '../lib/roster';
 
 
 function getStudentName(id: string, students: Student[]): string {
@@ -99,46 +100,24 @@ interface ClassRosterProps {
 }
 
 function ClassRoster({ assignments, students }: ClassRosterProps) {
-  const byClass: Record<number, ClassAssignment[]> = {};
-  for (const a of assignments) {
-    if (!byClass[a.class_number]) byClass[a.class_number] = [];
-    byClass[a.class_number].push(a);
-  }
-
-  const classNumbers = Object.keys(byClass).map(Number).sort((a, b) => a - b);
-
   return (
     <div className="roster-grid">
-      {classNumbers.map((cn) => {
-        const members = [...byClass[cn]].sort((a, b) => {
-          const sa = students.find((s) => s.id === a.student_id);
-          const sb = students.find((s) => s.id === b.student_id);
-          const na = sa ? `${sa.last_name} ${sa.first_name}` : '';
-          const nb = sb ? `${sb.last_name} ${sb.first_name}` : '';
-          return na.localeCompare(nb);
-        });
-        return (
-          <div key={cn} className="roster-class-card" style={classColorStyle(cn)}>
-            <div className="roster-class-header">
-              <span>{classLabel(cn)}</span>
-              <span style={{ fontWeight: 500 }}>{members.length} students</span>
-            </div>
-            {members.map((a) => {
-              const s = students.find((x) => x.id === a.student_id);
-              return (
-                <div key={a.student_id} className="roster-student-row">
-                  <span style={{ fontWeight: 600, fontSize: 13.5 }}>
-                    {s ? `${s.first_name} ${s.last_name}` : '[Removed student]'}
-                  </span>
-                  {s?.tags.map((t) => (
-                    <span key={t} className="tag-pill" style={{ fontSize: 11 }}>{t}</span>
-                  ))}
-                </div>
-              );
-            })}
+      {groupByClass(assignments, students).map(({ classNumber: cn, members }) => (
+        <div key={cn} className="roster-class-card" style={classColorStyle(cn)}>
+          <div className="roster-class-header">
+            <span>{classLabel(cn)}</span>
+            <span style={{ fontWeight: 500 }}>{members.length} students</span>
           </div>
-        );
-      })}
+          {members.map((m) => (
+            <div key={m.studentId} className="roster-student-row">
+              <span style={{ fontWeight: 600, fontSize: 13.5 }}>{m.name}</span>
+              {m.student?.tags.map((t) => (
+                <span key={t} className="tag-pill" style={{ fontSize: 11 }}>{t}</span>
+              ))}
+            </div>
+          ))}
+        </div>
+      ))}
     </div>
   );
 }
