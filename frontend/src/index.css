@@ -906,3 +906,21 @@ input[type='range'] {
 }
 .checkbox-field input { margin-top: 3px; accent-color: var(--teal); }
 .checkbox-caption { display: block; margin-top: 2px; font-size: 12px; color: var(--text3); }
+
+/* CSV import: unmatched pairing names + column notes */
+.decision-panel {
+  border: 1.5px solid var(--warn-border);
+  background: oklch(97% 0.04 88);
+  border-radius: var(--r-sm);
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  font-size: 13px;
+}
+.decision-panel-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; color: var(--warn-text); }
+.decision-list { display: flex; flex-direction: column; gap: 10px; max-height: 220px; overflow-y: auto; }
+.decision-item p { margin: 0 0 6px; color: var(--text); }
+.decision-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.decision-label { font-size: 12px; color: var(--text3); }
+.btn-sm { padding: 4px 10px; font-size: 12px; }
+.link-button { background: none; border: none; padding: 0; font: inherit; font-size: 12.5px; color: var(--teal); cursor: pointer; text-decoration: underline; }
+.column-notes { margin: 0 0 12px; padding-left: 18px; font-size: 12.5px; color: var(--text2); }

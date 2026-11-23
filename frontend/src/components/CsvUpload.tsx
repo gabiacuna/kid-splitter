@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../lib/api';
-import type { ImportConfirmResponse, ImportPreviewResponse, PreferenceMatch, PreviewRow } from '../lib/types';
+import type { ColumnNote, ImportConfirmResponse, ImportPreviewResponse, PreferenceMatch, PreviewRow } from '../lib/types';
 import { useToast } from './Toast';
 
 function StatusBadge({ status }: { status: PreviewRow['status'] }) {
@@ -108,14 +108,99 @@ function PreferenceCell({
 
 const isErrorRow = (r: PreviewRow) => r.status === 'missing_name' || r.status === 'invalid_tag';
 
+const normName = (s: string) => s.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().split(/\s+/).filter(Boolean).join(' ');
+
+/** One decision per distinct unmatched name, however many students listed it. */
+interface PendingName {
+  key: string;
+  name: string;
+  status: PreferenceMatch['status'];
+  owners: string[];
+  suggestions: string[];
+}
+
+function PendingNamesPanel({
+  pending,
+  onPick,
+  onAddNew,
+  onSkip,
+  onSkipAll,
+}: {
+  pending: PendingName[];
+  onPick: (key: string, display: string) => void;
+  onAddNew: (key: string) => void;
+  onSkip: (key: string) => void;
+  onSkipAll: () => void;
+}) {
+  return (
+    <section className="decision-panel" aria-label="Pairing names that need a decision">
+      <div className="decision-panel-head">
+        <strong>
+          {pending.length} pairing {pending.length === 1 ? 'name needs' : 'names need'} your decision
+        </strong>
+        <button type="button" className="link-button" onClick={onSkipAll}>Skip all</button>
+      </div>
+      <div className="decision-list">
+        {pending.map((p) => {
+          const canAdd = p.name.trim().split(/\s+/).length >= 2;
+          return (
+            <div key={p.key} className="decision-item">
+              <p>
+                <strong>{p.owners.join(', ')}</strong> {p.owners.length === 1 ? 'wants' : 'want'} to be with{' '}
+                <strong>“{p.name}”</strong>
+                {p.status === 'ambiguous' ? ', which matches more than one student.' : ', but no student has that name.'}
+              </p>
+              <div className="decision-actions">
+                {p.suggestions.length > 0 && <span className="decision-label">Did you mean</span>}
+                {p.suggestions.map((sug) => (
+                  <button key={sug} type="button" className="btn btn-secondary btn-sm" onClick={() => onPick(p.key, sug)}>
+                    {sug}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => onAddNew(p.key)}
+                  disabled={!canAdd}
+                  title={canAdd ? undefined : 'Needs a first and last name — edit the name in the table first'}
+                >
+                  + Add “{p.name}” as a new student
+                </button>
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => onSkip(p.key)}>
+                  Skip
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function ColumnNotes({ notes }: { notes: ColumnNote[] }) {
+  if (notes.length === 0) return null;
+  return (
+    <ul className="column-notes">
+      {notes.map((n) => (
+        <li key={n.column}>
+          Column <strong>{n.column}</strong>: {n.action === 'tags' ? n.detail : `ignored — ${n.detail}`}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function PreviewModal({
   cohortId,
   initialRows,
+  columnNotes,
   onClose,
   onSuccess,
 }: {
   cohortId: string;
   initialRows: PreviewRow[];
+  columnNotes: ColumnNote[];
   onClose: () => void;
   onSuccess: (students: number, constraints: number) => void;
 }) {
@@ -152,10 +237,61 @@ function PreviewModal({
   const hasPreferences = rows.some((r) => r.preferences.length > 0);
   const hasGender = rows.some((r) => r.gender || r.status === 'invalid_gender');
   const unclearGenderCount = rows.filter((r) => r.status === 'invalid_gender').length;
-  const unresolvedCount = rows.reduce(
-    (n, r) => n + r.preferences.filter((p) => p.status !== 'matched').length,
-    0,
-  );
+  const pending: PendingName[] = [];
+  for (const r of rows) {
+    if (isErrorRow(r)) continue;
+    for (const p of r.preferences) {
+      if (p.status === 'matched') continue;
+      const key = normName(p.name);
+      let entry = pending.find((e) => e.key === key);
+      if (!entry) {
+        entry = { key, name: p.name, status: p.status, owners: [], suggestions: p.suggestions ?? [] };
+        pending.push(entry);
+      }
+      entry.owners.push(r.first_name);
+    }
+  }
+  const unresolvedCount = pending.length;
+
+  /** Apply `update` to every unmatched preference whose name normalises to `key`. */
+  function resolveName(key: string, update: (p: PreferenceMatch) => PreferenceMatch | null) {
+    setRows((prev) => prev.map((r) => ({
+      ...r,
+      preferences: r.preferences.flatMap((p) => {
+        if (p.status === 'matched' || normName(p.name) !== key) return [p];
+        const next = update(p);
+        return next ? [next] : [];
+      }),
+    })));
+  }
+
+  function pickSuggestion(key: string, display: string) {
+    resolveName(key, () => ({ name: display, status: 'matched', matched_display: display }));
+  }
+
+  function addAsNewStudent(key: string) {
+    const entry = pending.find((e) => e.key === key);
+    if (!entry) return;
+    // Preference lists write "Given Surname", so the last word is the surname.
+    const words = entry.name.trim().split(/\s+/);
+    const first = words.slice(0, -1).join(' ');
+    const last = words[words.length - 1];
+    const display = `${first} ${last}`;
+    setRows((prev) => [
+      ...prev,
+      {
+        row_index: Math.max(-1, ...prev.map((r) => r.row_index)) + 1,
+        first_name: first,
+        last_name: last,
+        tags: [],
+        gender: null,
+        status: 'ok',
+        status_message: 'Added from a pairing preference',
+        preferences: [],
+      },
+    ]);
+    resolveName(key, () => ({ name: display, status: 'matched', matched_display: display }));
+  }
 
   function updateRow(index: number, field: keyof PreviewRow, value: string) {
     setRows((prev) => prev.map((r, i) => i === index ? { ...r, [field]: value } : r));
@@ -194,7 +330,7 @@ function PreviewModal({
 
   return (
     <div className="modal-overlay">
-      <div className="modal" style={{ maxWidth: 720, maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+      <div className="modal" style={{ maxWidth: 920, width: '100%', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
         <h2 className="modal-title">Preview import</h2>
         <p style={{ fontSize: 13.5, color: 'var(--text2)', marginBottom: 16 }}>
           Review the students below before confirming. You can edit names and tags inline.
@@ -211,11 +347,15 @@ function PreviewModal({
             {' '}{unclearGenderCount === 1 ? 'It' : 'They'} will be imported with gender unknown — set it in the student table afterwards.
           </div>
         )}
+        <ColumnNotes notes={columnNotes} />
         {unresolvedCount > 0 && (
-          <div className="warn-banner" style={{ marginBottom: 12 }}>
-            {unresolvedCount} pairing {unresolvedCount === 1 ? 'name' : 'names'} could not be matched to a
-            student (shown with a “?”) and will be skipped.
-          </div>
+          <PendingNamesPanel
+            pending={pending}
+            onPick={pickSuggestion}
+            onAddNew={addAsNewStudent}
+            onSkip={(key) => resolveName(key, () => null)}
+            onSkipAll={() => pending.forEach((p) => resolveName(p.key, () => null))}
+          />
         )}
         <div style={{ overflowY: 'auto', flex: 1 }}>
           <table>
@@ -253,7 +393,7 @@ function PreviewModal({
                       {row.gender === 'boy' ? 'Boy' : row.gender === 'girl' ? 'Girl' : '—'}
                     </td>
                   )}
-                  <td style={{ fontSize: 12.5 }}>{row.tags.join(', ')}</td>
+                  <td style={{ fontSize: 12.5, whiteSpace: 'nowrap' }}>{row.tags.join(', ')}</td>
                   {hasPreferences && (
                     <td style={{ fontSize: 12.5 }}>
                       <PreferenceCell
@@ -279,9 +419,14 @@ function PreviewModal({
           <button
             className="btn btn-primary"
             onClick={() => confirmMutation.mutate()}
-            disabled={validCount === 0 || confirmMutation.isPending}
+            disabled={validCount === 0 || unresolvedCount > 0 || confirmMutation.isPending}
+            title={unresolvedCount > 0 ? 'Decide what to do with the unmatched pairing names first' : undefined}
           >
-            {confirmMutation.isPending ? 'Importing…' : `Confirm import (${validCount} students)`}
+            {confirmMutation.isPending
+              ? 'Importing…'
+              : unresolvedCount > 0
+                ? `Decide ${unresolvedCount} ${unresolvedCount === 1 ? 'name' : 'names'} first`
+                : `Confirm import (${validCount} students)`}
           </button>
         </div>
       </div>
@@ -292,7 +437,7 @@ function PreviewModal({
 export default function CsvUploadButton({ cohortId }: { cohortId: string }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
-  const [previewRows, setPreviewRows] = useState<PreviewRow[] | null>(null);
+  const [preview, setPreview] = useState<ImportPreviewResponse | null>(null);
   const [uploadError, setUploadError] = useState('');
   const { showToast } = useToast();
 
@@ -309,7 +454,7 @@ export default function CsvUploadButton({ cohortId }: { cohortId: string }) {
       const res = await api.post<ImportPreviewResponse>(`/cohorts/${cohortId}/students/import`, fd, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
-      setPreviewRows(res.data.rows);
+      setPreview(res.data);
     } catch (err: unknown) {
       const status = (err as { response?: { status: number } }).response?.status;
       if (status === 422) {
@@ -343,13 +488,14 @@ export default function CsvUploadButton({ cohortId }: { cohortId: string }) {
         />
       </div>
 
-      {previewRows && (
+      {preview && (
         <PreviewModal
           cohortId={cohortId}
-          initialRows={previewRows}
-          onClose={() => setPreviewRows(null)}
+          initialRows={preview.rows}
+          columnNotes={preview.column_notes ?? []}
+          onClose={() => setPreview(null)}
           onSuccess={(students, constraints) => {
-            setPreviewRows(null);
+            setPreview(null);
             const msg = constraints > 0
               ? `${students} students added, ${constraints} "keep together" preferences created.`
               : `${students} students added.`;

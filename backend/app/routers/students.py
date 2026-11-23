@@ -11,7 +11,7 @@ from ..models.constraint import BinaryConstraint
 from ..schemas.student import (
     StudentCreate, StudentUpdate, StudentOut,
     ImportConfirmRequest, ImportConfirmResponse, ImportPreviewRow, ImportPreviewResponse,
-    PreferenceMatchOut, RematchRequest,
+    PreferenceMatchOut, RematchRequest, ColumnNoteOut,
 )
 from ..services.csv_import import (
     parse_csv_preview, IMPORTABLE_STATUSES, Candidate, match_preference,
@@ -96,10 +96,11 @@ async def import_preview(
     }
 
     try:
-        rows = await parse_csv_preview(data, existing_names)
+        preview = await parse_csv_preview(data, existing_names)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
 
+    rows = preview.rows
     candidates = existing_students + [
         Candidate(key=f"row:{r.row_index}", first=r.first_name, last=r.last_name)
         for r in rows if r.status in IMPORTABLE_STATUSES
@@ -111,7 +112,9 @@ async def import_preview(
         prefs = []
         for name in r.preferences:
             m = match_preference(name, candidates, self_key=f"row:{r.row_index}")
-            prefs.append(PreferenceMatchOut(name=m.name, status=m.status, matched_display=m.matched_display))
+            prefs.append(PreferenceMatchOut(
+                name=m.name, status=m.status, matched_display=m.matched_display, suggestions=m.suggestions,
+            ))
             if m.status == "matched":
                 matched += 1
             else:
@@ -135,6 +138,7 @@ async def import_preview(
         error_count=len(preview_rows) - ok_count,
         preferences_matched=matched,
         preferences_unresolved=unresolved,
+        column_notes=[ColumnNoteOut(column=n.column, action=n.action, detail=n.detail) for n in preview.column_notes],
     )
 
 
@@ -150,7 +154,9 @@ async def import_rematch(
         for r in body.rows if r.importable
     ]
     m = match_preference(body.name, candidates, self_key=f"row:{body.self_row_index}")
-    return PreferenceMatchOut(name=m.name, status=m.status, matched_display=m.matched_display)
+    return PreferenceMatchOut(
+        name=m.name, status=m.status, matched_display=m.matched_display, suggestions=m.suggestions,
+    )
 
 
 @router.post("/cohorts/{cohort_id}/students/import/confirm", response_model=ImportConfirmResponse, status_code=201)

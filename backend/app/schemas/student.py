@@ -101,6 +101,13 @@ class PreferenceMatchOut(BaseModel):
     name:            str
     status:          Literal["matched", "ambiguous", "unresolved"]
     matched_display: Optional[str] = None
+    suggestions:     list[str] = []
+
+
+class ColumnNoteOut(BaseModel):
+    column: str
+    action: Literal["tags", "ignored"]
+    detail: str
 
 
 class ImportPreviewRow(BaseModel):
@@ -121,6 +128,7 @@ class ImportPreviewResponse(BaseModel):
     error_count:            int
     preferences_matched:    int
     preferences_unresolved: int
+    column_notes:           list[ColumnNoteOut] = []
 
 
 class RosterRow(BaseModel):

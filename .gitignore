@@ -6,3 +6,7 @@ build/
 __pycache__/
 *.pyc
 .DS_Store
+
+# Real student data used for manual import testing — never commit
+*.csv
+!**/fixtures/**/*.csv

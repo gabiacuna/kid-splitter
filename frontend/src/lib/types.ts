@@ -87,6 +87,14 @@ export interface PreferenceMatch {
   name: string;
   status: 'matched' | 'ambiguous' | 'unresolved';
   matched_display?: string | null;
+  /** For unmatched names: roster students the teacher may have meant. */
+  suggestions?: string[];
+}
+
+export interface ColumnNote {
+  column: string;
+  action: 'tags' | 'ignored';
+  detail: string;
 }
 
 export interface PreviewRow {
@@ -107,6 +115,7 @@ export interface ImportPreviewResponse {
   error_count: number;
   preferences_matched: number;
   preferences_unresolved: number;
+  column_notes: ColumnNote[];
 }
 
 export interface ImportConfirmResponse {

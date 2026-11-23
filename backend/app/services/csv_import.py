@@ -2,6 +2,7 @@ import csv
 import io
 import re
 import unicodedata
+from difflib import SequenceMatcher
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -72,6 +73,27 @@ class PreferenceMatchResult:
     status:          str            # matched | ambiguous | unresolved
     matched_display: Optional[str] = None
     matched_key:     Optional[str] = None
+    suggestions:     list[str] = field(default_factory=list)  # displays the teacher can pick from
+
+
+@dataclass
+class ColumnNote:
+    column: str           # header as written in the file
+    action: str           # "tags" | "ignored"
+    detail: str
+
+
+@dataclass
+class CsvPreview:
+    rows:         list["PreviewRow"]
+    column_notes: list[ColumnNote]
+
+
+MAX_SUGGESTIONS = 3
+# Extra columns become tags only when their values actually group students.
+MAX_TAG_COLUMN_VALUES = 12
+MAX_TAG_LEN = 30
+MAX_TAGS = 10
 
 
 def _name_units(full: str) -> list[str]:
@@ -160,8 +182,66 @@ def match_preference(name: str, candidates: list[Candidate], self_key: Optional[
         c = next(iter(distinct.values()))
         return PreferenceMatchResult(name, "matched", c.display, c.key)
     if len(distinct) > 1:
-        return PreferenceMatchResult(name, "ambiguous")
-    return PreferenceMatchResult(name, "unresolved")
+        return PreferenceMatchResult(
+            name, "ambiguous",
+            suggestions=sorted(c.display for c in distinct.values())[:MAX_SUGGESTIONS * 2],
+        )
+    return PreferenceMatchResult(name, "unresolved", suggestions=_suggest(target, pool, forms))
+
+
+def _suggest(target: str, pool: list[Candidate], forms) -> list[str]:
+    """Closest roster names for a name that matched nobody: typos ("Irente" ~ "Irene")
+    score by similarity, and sharing a whole word ("Jacinta Lobos" -> Jacinta Latuz,
+    Catalina Lobos) also counts, so the teacher can say which student was meant."""
+    words = set(target.split())
+    scored: dict[str, float] = {}
+    for c in pool:
+        ratio = max(SequenceMatcher(None, target, f).ratio() for f in forms(c))
+        shared = words & set(normalize_name(c.display).split())
+        score = max(ratio, 0.6 + 0.1 * len(shared) if shared else 0.0)
+        if score >= 0.6:
+            scored[c.display] = max(score, scored.get(c.display, 0.0))
+    return [d for d, _ in sorted(scored.items(), key=lambda kv: (-kv[1], kv[0]))[:MAX_SUGGESTIONS]]
+
+
+def slug(s: str) -> str:
+    """Tag-safe form: 'Curso' + '2°A' -> 'curso', '2a'."""
+    s = normalize_name(s.replace("°", "").replace("º", "").replace("ª", ""))
+    return re.sub(r"[^a-z0-9]+", "-", s).strip("-")
+
+
+def _plan_extra_columns(original: list[str], used: set[str], raw_rows: list[dict]) -> tuple[list[str], list[ColumnNote]]:
+    """Decide which unrecognised columns become tags. A column qualifies when its values
+    group students (few distinct values, e.g. 'Curso': 2°A/2°B). Per-student identifiers
+    (all values unique, e.g. 'N°') and free text (many values) are ignored."""
+    tag_cols: list[str] = []
+    notes: list[ColumnNote] = []
+    for orig in original:
+        h = normalize_name(orig)
+        if h in used or not h:
+            continue
+        values = [(r.get(h) or "").strip() for r in raw_rows]
+        filled = [v for v in values if v]
+        distinct = {slug(v) for v in filled} - {""}
+        if not distinct:
+            notes.append(ColumnNote(orig, "ignored", "column is empty"))
+        elif all(v.isdigit() for v in filled):
+            notes.append(ColumnNote(orig, "ignored", "numbers only (looks like a list number)"))
+        elif len(filled) > 1 and len(distinct) == len(filled):
+            notes.append(ColumnNote(orig, "ignored", "every row has a different value (looks like an ID)"))
+        elif len(distinct) > MAX_TAG_COLUMN_VALUES:
+            notes.append(ColumnNote(orig, "ignored", f"too many different values ({len(distinct)}) to use as tags"))
+        else:
+            tag_cols.append(h)
+            examples = ", ".join(sorted(_column_tag(h, v) for v in distinct)[:4])
+            notes.append(ColumnNote(orig, "tags", f"added as tags: {examples}"))
+    return tag_cols, notes
+
+
+def _column_tag(header: str, value: str) -> str:
+    prefix = slug(header)
+    v = slug(value)
+    return (f"{prefix}-{v}" if prefix else v)[:MAX_TAG_LEN].strip("-")
 
 
 def _parse_gender(raw: str) -> tuple[Optional[str], Optional[str]]:
@@ -191,13 +271,14 @@ def _parse_tags(raw: str) -> tuple[list[str], Optional[str]]:
 async def parse_csv_preview(
     file_bytes: bytes,
     existing_names: set[str],
-) -> list[PreviewRow]:
-    text = file_bytes.decode("utf-8", errors="replace")
+) -> CsvPreview:
+    text = file_bytes.decode("utf-8-sig", errors="replace")  # -sig: tolerate Excel's BOM
     reader = csv.DictReader(io.StringIO(text))
 
-    # Normalise headers to lowercase, stripped
+    # Normalise headers: lowercase, accents stripped, whitespace collapsed
     if reader.fieldnames is None:
-        return []
+        return CsvPreview([], [])
+    original_headers = [f.strip() for f in reader.fieldnames]
     reader.fieldnames = [normalize_name(f) for f in reader.fieldnames]
     headers = reader.fieldnames
 
@@ -215,6 +296,11 @@ async def parse_csv_preview(
 
     if len(raw_rows) > MAX_ROWS:
         raise ValueError(f"CSV exceeds {MAX_ROWS} row limit")
+
+    used = {c for c in (first_col, last_col, full_col, gender_col, tags_col) if c} | set(pref_cols)
+    if not full_col and not first_col:
+        used |= {"first_name", "last_name"}
+    tag_cols, column_notes = _plan_extra_columns(original_headers, used, raw_rows)
 
     for i, row in enumerate(raw_rows):
         if full_col:
@@ -252,6 +338,12 @@ async def parse_csv_preview(
             continue
 
         tags, tag_err = _parse_tags(tags_raw)
+        for c in tag_cols:
+            v = (row.get(c) or "").strip()
+            t = _column_tag(c, v) if v else ""
+            if t and t not in tags:
+                tags.append(t)
+        tags = tags[:MAX_TAGS]
         if tag_err:
             rows.append(PreviewRow(
                 row_index=i,
@@ -288,4 +380,4 @@ async def parse_csv_preview(
                 preferences=preferences,
             ))
 
-    return rows
+    return CsvPreview(rows, column_notes)
