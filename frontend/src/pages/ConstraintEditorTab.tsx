@@ -7,6 +7,10 @@ import { TrashIcon } from '../components/Icons';
 import { validationKey } from '../lib/queryKeys';
 import { shortNames } from '../lib/roster';
 import { useT } from '../i18n';
+import HelpTip from '../components/HelpTip';
+import TypeChip from '../components/TypeChip';
+import ErrorState from '../components/ErrorState';
+import { loadErrorMessage } from '../lib/errors';
 
 /*
  * Constraint editor (design features 04 + 05).
@@ -194,7 +198,10 @@ const unaryBody = (v: UnaryDraft) => ({
 function useConstraintRow<T extends { id?: string }>(
   kind: Kind, draft: T, cohortId: string,
   isComplete: (v: T) => boolean, toBody: (v: T) => object, onRemoved: () => void,
+  onCreated?: (id: string) => void,
 ) {
+  const onCreatedRef = useRef(onCreated);
+  onCreatedRef.current = onCreated;
   const [c, setC] = useState(draft);
   const [error, setError] = useState('');
   const [deleting, setDeleting] = useState(false);
@@ -207,8 +214,22 @@ function useConstraintRow<T extends { id?: string }>(
     const res = id
       ? await api.put<{ id: string }>(`/constraints/${kind}/${id}`, toBody(v))
       : await api.post<{ id: string }>(`/cohorts/${cohortId}/constraints/${kind}`, toBody(v));
-    return res.data.id;
-  }, [kind, cohortId, toBody]);
+    // Write the saved rule into the cache right away. Rows are snapshotted from this cache when
+    // the tab mounts, so a stale copy (before the post-save refetch lands) would bring back old
+    // values on remount, and the next edit to that row would save them over the teacher's change.
+    const saved = res.data as { id: string };
+    qc.setQueryData<ConstraintCache>(['constraints', cohortId], (old) => {
+      if (!old) return old;
+      const list = old[kind] as { id: string }[];
+      const next = list.some((x) => x.id === saved.id)
+        ? list.map((x) => (x.id === saved.id ? saved : x))
+        : [...list, saved];
+      return { ...old, [kind]: next };
+    });
+    // A new rule's id only exists here; the editor needs it to badge and group the row.
+    if (!id) onCreatedRef.current?.(saved.id);
+    return saved.id;
+  }, [kind, cohortId, toBody, qc]);
   const { schedule, idRef, settle } = useRowAutosave(draft.id, isComplete, persist, setError);
 
   function update(patch: Partial<T>) {
@@ -239,26 +260,25 @@ function useConstraintRow<T extends { id?: string }>(
 
 interface RowProps<T> {
   rowKey: string; draft: T; students: Student[]; cohortId: string; onRemoved: (key: string) => void;
+  onCreated?: (key: string, id: string) => void;
 }
 
 // Memoised: a CSV import can create hundreds of rows, each with a full student list.
-const BinaryRow = memo(function BinaryRow({ rowKey, draft, students, cohortId, badgeId, badgeSeverity, onRemoved }:
+const BinaryRow = memo(function BinaryRow({ rowKey, draft, students, cohortId, badgeId, badgeSeverity, onRemoved, onCreated }:
   RowProps<BinaryDraft> & { badgeId?: number; badgeSeverity?: 'hard' | 'soft' }) {
   const { c, update, error, deleting, handleDelete, incomplete } =
-    useConstraintRow('binary', draft, cohortId, isBinaryComplete, binaryBody, () => onRemoved(rowKey));
+    useConstraintRow('binary', draft, cohortId, isBinaryComplete, binaryBody, () => onRemoved(rowKey), (id) => onCreated?.(rowKey, id));
   const t = useT();
   return (
     <div className={`constraint-row binary${badgeId ? ` conflict conflict-${badgeSeverity}` : ''}${incomplete ? ' incomplete' : ''}`}>
       {badgeId && <span className="conflict-badge" aria-label={t('Conflict {n}', { n: badgeId })}>{badgeId}</span>}
       <StudentSelect label={t('Student A')} value={c.student_a_id} onChange={(v) => update({ student_a_id: v })} students={students} exclude={c.student_b_id} />
       <StudentSelect label={t('Student B')} value={c.student_b_id} onChange={(v) => update({ student_b_id: v })} students={students} exclude={c.student_a_id} />
-      <select
-        className={`type-select ${c.type}`} value={c.type} aria-label={t('Type')}
-        onChange={(e) => update({ type: e.target.value as BinaryConstraint['type'] })}
-      >
-        <option value="together">{t('Together')}</option>
-        <option value="separate">{t('Separate')}</option>
-      </select>
+      <TypeChip<BinaryConstraint['type']>
+        value={c.type} label={t('Type')}
+        options={[{ value: 'together', label: t('Together') }, { value: 'separate', label: t('Separate') }]}
+        onChange={(v) => update({ type: v })}
+      />
       <HardCheckbox checked={c.is_hard} onChange={(v) => update({ is_hard: v })} />
       <WeightSlider value={c.weight} onChange={(v) => update({ weight: v })} disabled={c.is_hard} />
       <DeleteControl onDelete={handleDelete} busy={deleting} />
@@ -319,6 +339,9 @@ function ConflictBanner({ groups, binary, students }: { groups: ConflictGroup[];
   const short = useMemo(() => shortNames(students), [students]);
   const name = (id: string) => short.get(id) ?? '?';
   const t = useT();
+  const tip = hard.length > 0
+    ? t('Two required rules can’t both be met. Fix it before generating the lists.')
+    : t('The lists will have to leave out some preference.');
   const title = hard.length > 0
     ? (hard.length === 1
       ? t('{n} contradiction found — resolve before solving.', { n: hard.length })
@@ -331,7 +354,7 @@ function ConflictBanner({ groups, binary, students }: { groups: ConflictGroup[];
     <div className={`conflict-banner${hard.length ? '' : ' soft'}`} role="status">
       <div className="conflict-banner-head">
         <span aria-hidden>⚠</span>
-        <span className="conflict-banner-title">{title}</span>
+        <span className="conflict-banner-title">{title}<HelpTip text={tip} /></span>
         <button type="button" className="conflict-why" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
           {open ? t('Hide') : t('Why?')}
         </button>
@@ -342,7 +365,7 @@ function ConflictBanner({ groups, binary, students }: { groups: ConflictGroup[];
             const rules = g.constraint_ids.map((id) => byId.get(id)).filter(Boolean) as BinaryConstraint[];
             return (
               <div key={g.id} className="conflict-group">
-                <p><span className={`conflict-num ${g.severity}`}>{g.id}</span> {g.explanation}</p>
+                <p><span className={`conflict-num ${g.severity}`}>{g.id}</span> {explainConflict(g, name, t)}</p>
                 <div className="conflict-chips">
                   {rules.slice(0, MAX_CHIPS).map((r) => (
                     <span key={r.id} className="conflict-chip">
@@ -369,19 +392,19 @@ function ConflictBanner({ groups, binary, students }: { groups: ConflictGroup[];
 let _tempKey = 0;
 const newKey = () => `new-${++_tempKey}`;
 
-export default function ConstraintEditorTab({ cohortId }: { cohortId: string }) {
+export default function ConstraintEditorTab({ cohortId, onGoToSolutions }: { cohortId: string; onGoToSolutions?: () => void }) {
   const qc = useQueryClient();
   const t = useT();
 
-  const { data: constraintData, isLoading } = useQuery<{ binary: BinaryConstraint[]; unary: UnaryConstraint[] }>({
+  const { data: constraintData, isLoading, isError, error, refetch, isRefetching } = useQuery<{ binary: BinaryConstraint[]; unary: UnaryConstraint[] }>({
     queryKey: ['constraints', cohortId],
     queryFn: () => api.get(`/cohorts/${cohortId}/constraints`).then((r) => r.data),
   });
-  const { data: students = [] } = useQuery<Student[]>({
+  const { data: students = [], isError: studentsFailed, error: studentsError, refetch: refetchStudents, isRefetching: refetchingStudents } = useQuery<Student[]>({
     queryKey: ['students', cohortId],
     queryFn: () => api.get(`/cohorts/${cohortId}/students`).then((r) => r.data),
   });
-  const { data: validation } = useQuery<ValidationResult>({
+  const { data: validation, isError: validationFailed, refetch: refetchValidation, isRefetching: refetchingValidation } = useQuery<ValidationResult>({
     queryKey: validationKey(cohortId),
     queryFn: () => api.get(`/cohorts/${cohortId}/constraints/validate`).then((r) => r.data),
   });
@@ -421,6 +444,9 @@ export default function ConstraintEditorTab({ cohortId }: { cohortId: string }) 
   }, [constraintData]);
 
   const removeBinary = useCallback((key: string) => setBinaryRows((rows) => rows!.filter((x) => x.key !== key)), []);
+  const binaryCreated = useCallback((key: string, id: string) => setBinaryRows((rows) => rows!.map((x) => (
+    x.key === key && x.value.id !== id ? { ...x, value: { ...x.value, id } } : x
+  ))), []);
   const removeUnary = useCallback((key: string) => setUnaryRows((rows) => rows!.filter((x) => x.key !== key)), []);
 
   function addBinary() {
@@ -436,12 +462,24 @@ export default function ConstraintEditorTab({ cohortId }: { cohortId: string }) 
     }]);
   }
 
+  // A load error used to leave the spinner going forever.
+  if (isError && !constraintData) {
+    return <ErrorState message={loadErrorMessage(error, 'We couldn’t load the preferences.')} onRetry={() => refetch()} retrying={isRefetching} />;
+  }
+  if (studentsFailed) {
+    return <ErrorState message={loadErrorMessage(studentsError, 'We couldn’t load the students.')} onRetry={() => refetchStudents()} retrying={refetchingStudents} />;
+  }
   if (isLoading || binaryRows === null || unaryRows === null) return <div><div className="spinner" /></div>;
+
+  const noStudentsReasonId = `no-students-${cohortId}`;
 
   return (
     <SaveTrackerContext.Provider value={tracker}>
       <div className="constraint-editor">
         {noStudents && <div className="warn-banner" style={{ marginBottom: 20 }}>{t('Add students before creating constraints.')}</div>}
+        {validationFailed && (
+          <ErrorState compact message={t('We couldn’t check your rules for contradictions.')} onRetry={() => refetchValidation()} retrying={refetchingValidation} />
+        )}
 
         <div className="constraint-toolbar">
           <span className="constraint-count">
@@ -456,12 +494,36 @@ export default function ConstraintEditorTab({ cohortId }: { cohortId: string }) 
 
         {groups.length > 0 && <ConflictBanner groups={groups} binary={constraintData?.binary ?? []} students={students} />}
 
-        {binaryRows.length > 0 && (
-          <div className="constraint-header" aria-hidden>
-            <span>{t('Student A')}</span><span>{t('Student B')}</span><span>{t('Type')}</span><span>{t('Hard')}</span><span>{t('Weight')}</span><span />
+        {binaryRows.length === 0 && !noStudents && (
+          <div className="empty-state constraints-empty">
+            <h3>{t('No preferences yet')}</h3>
+            <p>{t('They’re optional: you can generate class lists without them.')}</p>
+            <p>{t('Add one when two students should share a class, or be kept apart.')}</p>
+            {onGoToSolutions && (
+              <button type="button" className="btn btn-secondary" onClick={onGoToSolutions}>{t('Go to class lists →')}</button>
+            )}
           </div>
         )}
-        {binaryRows.map((r) => {
+        {binaryRows.length > 0 && (
+          <div className="constraint-header">
+            <span>{t('Student A')}</span><span>{t('Student B')}</span>
+            <span>{t('Type')}<HelpTip text={t('Together: same class. Separate: different classes.')} /></span>
+            <span>{t('Hard')}<HelpTip text={t('Always met; if that’s impossible, no lists are generated.')} /></span>
+            <span>{t('Weight')}<HelpTip text={t('How much it matters compared with the others (1 a little, 10 a lot).')} /></span>
+            <span />
+          </div>
+        )}
+        {/* One flat keyed list (section heads + rows as siblings), so a row that moves between
+            sections is re-ordered, not re-mounted, and keeps its unsaved state. */}
+        {groupedRows(binaryRows, groups, badgeFor).map((item) => {
+          if (item.kind === 'head') {
+            return (
+              <div key={item.key} className={`rules-section-head${item.severity ? ` conflict-${item.severity}` : ''}`} role="heading" aria-level={3}>
+                <span>{item.label === 'rest' ? t('Other rules ({n})', { n: item.n }) : t('Conflict {n}', { n: item.n })}</span>
+              </div>
+            );
+          }
+          const r = item.row;
           const badge = r.value.id ? badgeFor.get(r.value.id) : undefined;
           return (
             <BinaryRow
@@ -473,12 +535,14 @@ export default function ConstraintEditorTab({ cohortId }: { cohortId: string }) 
               badgeId={badge?.id}
               badgeSeverity={badge?.severity}
               onRemoved={removeBinary}
+              onCreated={binaryCreated}
             />
           );
         })}
-        <button type="button" className="add-constraint" onClick={addBinary} disabled={noStudents}>
+        <button type="button" className="add-constraint" onClick={addBinary} disabled={noStudents} aria-describedby={noStudents ? noStudentsReasonId : undefined}>
           {t('+ Add constraint')}
         </button>
+        {noStudents && <p id={noStudentsReasonId} className="disabled-reason">{t('Add students before creating constraints.')}</p>}
 
         <details className="advanced-constraints" open={advancedOpen} onToggle={(e) => setAdvancedOpen(e.currentTarget.open)}>
           <summary>
@@ -497,11 +561,86 @@ export default function ConstraintEditorTab({ cohortId }: { cohortId: string }) 
               onRemoved={removeUnary}
             />
           ))}
-          <button type="button" className="add-constraint" onClick={addUnary} disabled={noStudents}>
+          <button type="button" className="add-constraint" onClick={addUnary} disabled={noStudents} aria-describedby={noStudents ? noStudentsReasonId : undefined}>
             {t('+ Add advanced rule')}
           </button>
         </details>
       </div>
     </SaveTrackerContext.Provider>
   );
+}
+
+const MAX_NAMES_IN_TEXT = 5;
+
+/** "Ana, Beto y Cris" / "Ana, Beto, … y 3 más", in the current language. */
+function nameList(ids: string[], name: (id: string) => string, t: ReturnType<typeof useT>): string {
+  const labels = ids.map(name).sort((x, y) => x.localeCompare(y));
+  if (labels.length > MAX_NAMES_IN_TEXT) {
+    return t('{names} and {n} more', { names: labels.slice(0, MAX_NAMES_IN_TEXT).join(', '), n: labels.length - MAX_NAMES_IN_TEXT });
+  }
+  if (labels.length <= 1) return labels.join('');
+  return t('{names} and {last}', { names: labels.slice(0, -1).join(', '), last: labels[labels.length - 1] });
+}
+
+/** Builds the "Why?" sentence from the conflict's type and params, so it follows the UI language.
+ *  Falls back to the backend's English text if params are missing (older API). */
+function explainConflict(g: ConflictGroup, name: (id: string) => string, t: ReturnType<typeof useT>): string {
+  const p = g.params ?? {};
+  switch (g.type) {
+    case 'direct_conflict':
+      if (p.a && p.b) return t('{a} and {b} must be together, but must also be apart. Remove one of these two rules.', { a: name(p.a), b: name(p.b) });
+      break;
+    case 'chain_conflict':
+      if (p.a && p.b && p.path) return t('{a} and {b} must be apart, but “must be together” rules link them ({path}), so they would land in the same class. Remove one of these rules.', { a: name(p.a), b: name(p.b), path: p.path.map(name).join(' → ') });
+      break;
+    case 'cluster_overflow':
+      if (p.students && p.max_size) return t('{n} students are linked by “must be together” rules ({names}), but a class holds at most {max}. Remove one of these rules or add a class.', { n: p.students.length, names: nameList(p.students, name, t), max: p.max_size });
+      break;
+    case 'coloring_impossible':
+      if (p.students && p.rules && p.classes) return t('These {n} “must be apart” rules (between {names}) need more than {k} classes, and you have {k}. No single rule is to blame: add a class, or remove one of these rules.', { n: p.rules, names: nameList(p.students, name, t), k: p.classes });
+      break;
+    case 'soft_warning':
+      if (p.a && p.mid && p.c) return t('{a} and {b} prefer to be together, and so do {b} and {c}, but {a} and {c} prefer to be apart. The lists will have to leave out one of these preferences.', { a: name(p.a), b: name(p.mid), c: name(p.c) });
+      break;
+  }
+  return g.explanation;
+}
+
+type RowItem =
+  | { kind: 'head'; key: string; label: 'conflict' | 'rest'; n: number; severity?: 'hard' | 'soft' }
+  | { kind: 'row'; key: string; row: Draft<BinaryDraft> };
+
+/**
+ * Rules in a conflict go first, under one heading per conflict (hard ones first, as the
+ * validator numbers them), then the rest in their usual order. A rule in several conflicts
+ * sits in the lowest-numbered one, matching its badge. Without conflicts: no headings at all.
+ */
+function groupedRows(
+  rows: Draft<BinaryDraft>[],
+  groups: ConflictGroup[],
+  badgeFor: Map<string, { id: number; severity: 'hard' | 'soft' }>,
+): RowItem[] {
+  const byGroup = new Map<number, Draft<BinaryDraft>[]>();
+  const rest: Draft<BinaryDraft>[] = [];
+  for (const r of rows) {
+    const badge = r.value.id ? badgeFor.get(r.value.id) : undefined;
+    if (!badge) { rest.push(r); continue; }
+    const list = byGroup.get(badge.id) ?? [];
+    list.push(r);
+    byGroup.set(badge.id, list);
+  }
+  if (byGroup.size === 0) return rows.map((row) => ({ kind: 'row', key: row.key, row }));
+
+  const items: RowItem[] = [];
+  for (const g of groups) {
+    const list = byGroup.get(g.id);
+    if (!list) continue;
+    items.push({ kind: 'head', key: `head-conflict-${g.id}`, label: 'conflict', n: g.id, severity: g.severity });
+    for (const row of list) items.push({ kind: 'row', key: row.key, row });
+  }
+  if (rest.length) {
+    items.push({ kind: 'head', key: 'head-rest', label: 'rest', n: rest.length });
+    for (const row of rest) items.push({ kind: 'row', key: row.key, row });
+  }
+  return items;
 }

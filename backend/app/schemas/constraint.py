@@ -137,6 +137,7 @@ class ConflictGroupOut(BaseModel):
     constraint_ids: list[str]
     student_ids:    list[str]
     explanation:    str
+    params:         dict = {}
 
 
 class ValidationOut(BaseModel):
