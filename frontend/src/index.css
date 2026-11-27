@@ -1133,8 +1133,8 @@ input[type='range'] {
 .helptip-btn::after { content: ''; position: absolute; inset: -13px; }
 .helptip-btn:hover, .helptip-btn[aria-expanded='true'] { border-color: var(--teal); color: var(--teal-dark); }
 .helptip-bubble {
-  position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
-  width: max-content; max-width: min(280px, 80vw); z-index: 400;
+  position: fixed; top: 0; left: 0;
+  width: max-content; max-width: min(280px, 80vw); z-index: 1000;
   background: var(--text); color: #fff; border-radius: var(--r-sm); padding: 8px 11px;
   font-size: 12.5px; font-weight: 500; line-height: 1.4; text-align: left; white-space: normal;
   text-transform: none; letter-spacing: normal; font-style: normal;
