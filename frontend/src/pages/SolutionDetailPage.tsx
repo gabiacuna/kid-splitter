@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import api from '../lib/api';
@@ -10,6 +10,9 @@ import { classColorStyle, classLabel } from '../lib/classes';
 import { variantName } from '../lib/solutions';
 import { groupByClass, studentName } from '../lib/roster';
 import { useT } from '../i18n';
+import HelpTip from '../components/HelpTip';
+import ErrorState from '../components/ErrorState';
+import { httpStatus, loadErrorMessage } from '../lib/errors';
 
 function computeBinarySatisfaction(
   constraint: BinaryConstraint,
@@ -39,7 +42,7 @@ function ConstraintSummary({ binary, assignments, students }: ConstraintSummaryP
     const { satisfied, classA, classB } = computeBinarySatisfaction(c, asgn);
     const nameA = studentName(byId.get(c.student_a_id));
     const nameB = studentName(byId.get(c.student_b_id));
-    const hardLabel = c.is_hard ? t('hard') : t('soft, w{w}', { w: c.weight.toFixed(1) });
+    const hardLabel = c.is_hard ? t('hard') : t('flexible, weight {w}', { w: Math.round(c.weight * 10) / 10 });
     const description = t('{a} + {b}: {type} ({label})', { a: nameA, b: nameB, type: t(c.type), label: hardLabel });
     let detail = satisfied ? t('Satisfied') : '';
     if (!satisfied) {
@@ -62,12 +65,14 @@ function ConstraintSummary({ binary, assignments, students }: ConstraintSummaryP
   return (
     <div className="card" style={{ marginTop: 24 }}>
       <button
+        type="button"
+        aria-expanded={open}
         onClick={() => setOpen((p) => !p)}
         style={{ background: 'none', border: 'none', cursor: 'pointer', width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 0 }}
       >
         <span style={{ fontSize: 15, fontWeight: 700 }}>{t('Constraint satisfaction')}</span>
         <span style={{ fontSize: 13, color: 'var(--text3)' }}>
-          {t('{n} satisfied', { n: satisfiedCount })} · {t('{n} violated', { n: violatedCount })} {open ? '▲' : '▼'}
+          {t('{n} satisfied', { n: satisfiedCount })} · {t('{n} violated', { n: violatedCount })} <span aria-hidden>{open ? '▲' : '▼'}</span>
         </span>
       </button>
 
@@ -78,7 +83,7 @@ function ConstraintSummary({ binary, assignments, students }: ConstraintSummaryP
           )}
           {results.map((r, i) => (
             <div key={i} className={`constraint-summary-row${r.satisfied ? '' : ' violated'}`}>
-              <span className="cs-icon">{r.satisfied ? '✓' : '✗'}</span>
+              <span className="cs-icon" aria-hidden>{r.satisfied ? '✓' : '✗'}</span>
               <div>
                 <div style={{ fontWeight: 600 }}>{r.description}</div>
                 <div style={{ fontSize: 12.5, color: r.satisfied ? 'var(--sage)' : 'var(--coral)', marginTop: 2 }}>{r.detail}</div>
@@ -129,7 +134,7 @@ export default function SolutionDetailPage() {
   const [shareEnabled, setShareEnabled] = useState<boolean | null>(null);
   const [shareToken, setShareToken] = useState<string | null>(null);
 
-  const { data: solution, isLoading: solutionLoading, isError: solutionError, error: solutionErr } = useQuery<Solution>({
+  const { data: solution, isLoading: solutionLoading, isError: solutionError, error: solutionErr, refetch, isRefetching } = useQuery<Solution>({
     queryKey: ['solution', id],
     queryFn: () => api.get(`/solutions/${id}`).then((r) => r.data),
     retry: false,
@@ -137,28 +142,30 @@ export default function SolutionDetailPage() {
 
   const cohortId = solution?.cohort_id;
 
-  const { data: students = [] } = useQuery<Student[]>({
+  const studentsQ = useQuery<Student[]>({
     queryKey: ['students', cohortId],
     queryFn: () => api.get(`/cohorts/${cohortId}/students`).then((r) => r.data),
     enabled: !!cohortId,
   });
+  const students = studentsQ.data ?? [];
 
-  const { data: constraintData } = useQuery<{ binary: BinaryConstraint[]; unary: UnaryConstraint[] }>({
+  const constraintsQ = useQuery<{ binary: BinaryConstraint[]; unary: UnaryConstraint[] }>({
     queryKey: ['constraints', cohortId],
     queryFn: () => api.get(`/cohorts/${cohortId}/constraints`).then((r) => r.data),
     enabled: !!cohortId,
   });
+  const constraintData = constraintsQ.data;
 
-  if (solutionError) {
-    const status = (solutionErr as { response?: { status: number } })?.response?.status;
-    if (status === 403 || status === 404) {
-      showToast(t('Solution not found.'), 'error');
-      navigate('/cohorts');
-      return null;
-    }
-  }
+  // Only "gone / not yours" redirects; a server or network error gets a retry instead of a blank page.
+  const status = httpStatus(solutionErr);
+  const gone = solutionError && (status === 403 || status === 404);
+  useEffect(() => {
+    if (!gone) return;
+    showToast(t('Solution not found.'), 'error');
+    navigate('/cohorts', { replace: true });
+  }, [gone, navigate, showToast, t]);
 
-  if (solutionLoading) {
+  if (solutionLoading || gone) {
     return (
       <>
         <Nav />
@@ -167,7 +174,16 @@ export default function SolutionDetailPage() {
     );
   }
 
-  if (!solution) return null;
+  if (solutionError || !solution) {
+    return (
+      <>
+        <Nav />
+        <div className="page-wrap" style={{ paddingTop: 28 }}>
+          <ErrorState message={loadErrorMessage(solutionErr, 'We couldn’t load these class lists.')} onRetry={() => refetch()} retrying={isRefetching} />
+        </div>
+      </>
+    );
+  }
 
   const effectiveShareEnabled = shareEnabled ?? solution.share_enabled;
   const effectiveShareToken = shareToken;
@@ -190,6 +206,7 @@ export default function SolutionDetailPage() {
               {solution.hard_violations === 1
                 ? t('⚠ This solution has {n} hard constraint violation. This indicates a solver problem — do not use this arrangement.', { n: solution.hard_violations })
                 : t('⚠ This solution has {n} hard constraint violations. This indicates a solver problem — do not use this arrangement.', { n: solution.hard_violations })}
+              {' '}<Link to={`/cohorts/${cohortId}?tab=solutions`} style={{ fontWeight: 700, textDecoration: 'underline' }}>{t('Generate the lists again')}</Link>
             </div>
           )}
 
@@ -200,6 +217,7 @@ export default function SolutionDetailPage() {
                 <span>
                   <span className="solution-score" style={{ fontSize: 22 }}>{Math.round(solution.score)}</span>
                   <span style={{ fontSize: 13, color: 'var(--text3)', marginLeft: 6 }}>{t('/ 100 score')}</span>
+                  <HelpTip text={t('% of flexible preferences met. Doesn’t include the gender balance.')} />
                 </span>
                 {solution.hard_violations > 0 && (
                   <span className="badge badge-red">
@@ -211,16 +229,25 @@ export default function SolutionDetailPage() {
                 <span className="badge badge-teal">{t('{n} soft unmet', { n: solution.soft_violations })}</span>
               </div>
             </div>
-            <button
-              className={`btn ${effectiveShareEnabled ? 'btn-secondary' : 'btn-outline'}`}
-              onClick={() => setShowShare(true)}
-            >
-              {effectiveShareEnabled ? t('Shared ✓') : t('Share')}
-            </button>
+            <span className="share-btn-wrap">
+              <button
+                className={`btn ${effectiveShareEnabled ? 'btn-secondary' : 'btn-outline'}`}
+                onClick={() => setShowShare(true)}
+              >
+                {effectiveShareEnabled ? t('Shared ✓') : t('Share')}
+              </button>
+              <HelpTip text={t('Anyone with the link can see it without signing in.')} />
+            </span>
           </div>
         </div>
 
+        {studentsQ.isError && (
+          <ErrorState message={loadErrorMessage(studentsQ.error, 'We couldn’t load the students’ names.')} onRetry={() => studentsQ.refetch()} retrying={studentsQ.isRefetching} />
+        )}
         <ClassRoster assignments={solution.class_assignments} students={students} />
+        {constraintsQ.isError && (
+          <ErrorState message={loadErrorMessage(constraintsQ.error, 'We couldn’t load the preferences to check them.')} onRetry={() => constraintsQ.refetch()} retrying={constraintsQ.isRefetching} />
+        )}
 
         <ConstraintSummary
           binary={binary}

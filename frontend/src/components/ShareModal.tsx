@@ -3,6 +3,8 @@ import { useMutation } from '@tanstack/react-query';
 import api from '../lib/api';
 import { useToast } from './Toast';
 import { useT } from '../i18n';
+import Modal from './Modal';
+import HelpTip from './HelpTip';
 
 const SHARE_BASE = import.meta.env.VITE_SHARE_BASE_URL ?? window.location.origin;
 
@@ -45,9 +47,11 @@ export default function ShareModal({ solutionId, shareEnabled, shareToken, onClo
   }
 
   return (
-    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal">
-        <h2 className="modal-title">{t('Share this class list')}</h2>
+    <Modal
+      title={<>{t('Share this class list')}<HelpTip text={t('Anyone with the link can see it without signing in.')} /></>}
+      onClose={onClose}
+      busy={generateMutation.isPending || revokeMutation.isPending}
+    >
 
         {!shareEnabled ? (
           <>
@@ -69,6 +73,7 @@ export default function ShareModal({ solutionId, shareEnabled, shareToken, onClo
                 type="text"
                 value={url}
                 readOnly
+                aria-label={t('Share link')}
                 className="share-url-input"
                 onFocus={(e) => e.target.select()}
               />
@@ -99,7 +104,6 @@ export default function ShareModal({ solutionId, shareEnabled, shareToken, onClo
         <div className="modal-footer" style={{ marginTop: 20 }}>
           <button className="btn btn-secondary" onClick={onClose}>{t('Close')}</button>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

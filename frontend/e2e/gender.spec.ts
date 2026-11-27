@@ -35,7 +35,7 @@ test('gender: balance checkbox persists via the edit modal', async ({ page, api 
   await page.goto('/cohorts');
   const card = page.locator('.cohort-card', { has: page.locator('h2', { hasText: cohort.name }) });
   await card.getByRole('button', { name: 'Cohort options' }).click();
-  await page.getByRole('button', { name: 'Edit' }).click();
+  await page.getByRole('menuitem', { name: 'Edit' }).click();
   await page.getByLabel(/balanced mix of boys and girls/).check();
   await page.getByRole('button', { name: 'Save' }).click();
   await expect.poll(async () => (await api.get(`/cohorts/${cohort.id}`)).balance_gender).toBe(true);

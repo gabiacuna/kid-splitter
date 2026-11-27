@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import api from '../lib/api';
@@ -10,8 +10,10 @@ import { layoutMap, MAP_H, MAP_W } from '../lib/preferenceMap';
 import { CollapseIcon, ExpandIcon, SheetIcon } from './Icons';
 import { useT } from '../i18n';
 import { downloadFile } from '../lib/download';
-
-const FOCUSABLE = 'a[href], button:not([disabled]), input, select, textarea, [tabindex]:not([tabindex="-1"])';
+import Modal from './Modal';
+import HelpTip from './HelpTip';
+import ErrorState from './ErrorState';
+import { loadErrorMessage } from '../lib/errors';
 
 const initials = (name: string) =>
   name.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]?.toUpperCase()).join('');
@@ -100,15 +102,14 @@ function ExportButton({ solutionId }: { solutionId: string }) {
 export default function RosterModal({ solution, onClose }: { solution: Solution; onClose: () => void }) {
   const [expanded, setExpanded] = useState(false);
   const t = useT();
-  const dialogRef = useRef<HTMLDivElement>(null);
   const titleId = `roster-title-${solution.id}`;
   const cohortId = solution.cohort_id;
 
-  const { data: students, isLoading: loadingStudents } = useQuery<Student[]>({
+  const { data: students, isLoading: loadingStudents, isError: studentsFailed, error: studentsError, refetch: refetchStudents, isRefetching: refetchingStudents } = useQuery<Student[]>({
     queryKey: ['students', cohortId],
     queryFn: () => api.get(`/cohorts/${cohortId}/students`).then((r) => r.data),
   });
-  const { data: constraints } = useQuery<{ binary: BinaryConstraint[]; unary: UnaryConstraint[] }>({
+  const { data: constraints, isError: constraintsFailed, error: constraintsError, refetch: refetchConstraints, isRefetching: refetchingConstraints } = useQuery<{ binary: BinaryConstraint[]; unary: UnaryConstraint[] }>({
     queryKey: ['constraints', cohortId],
     queryFn: () => api.get(`/cohorts/${cohortId}/constraints`).then((r) => r.data),
     enabled: expanded, // only the preference map needs these
@@ -118,42 +119,19 @@ export default function RosterModal({ solution, onClose }: { solution: Solution;
   const names = useMemo(() => new Map(classes.flatMap((c) => c.members.map((m) => [m.studentId, m.name] as const))), [classes]);
   const pairs = useMemo(() => togetherPairs(constraints?.binary ?? [], solution.class_assignments), [constraints, solution]);
 
-  // Focus: move into the dialog, trap Tab, close on Escape, give focus back to the opener.
-  useEffect(() => {
-    const opener = document.activeElement as HTMLElement | null;
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    dialogRef.current?.focus();
-    return () => {
-      document.body.style.overflow = prevOverflow;
-      if (opener?.isConnected) opener.focus();
-    };
-  }, []);
-
-  function onKeyDown(e: React.KeyboardEvent) {
-    if (e.key === 'Escape') { e.stopPropagation(); onClose(); return; }
-    if (e.key !== 'Tab' || !dialogRef.current) return;
-    const items = [...dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE)];
-    if (items.length === 0) { e.preventDefault(); return; }
-    const first = items[0], last = items[items.length - 1];
-    const active = document.activeElement;
-    if (e.shiftKey && (active === first || active === dialogRef.current)) { e.preventDefault(); last.focus(); }
-    else if (!e.shiftKey && active === last) { e.preventDefault(); first.focus(); }
-  }
-
   return (
-    <div className="modal-overlay roster-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div ref={dialogRef} className={`modal roster-modal${expanded ? ' expanded' : ''}`}
-        role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} onKeyDown={onKeyDown}>
+    <Modal labelledBy={titleId} onClose={onClose} className={`roster-modal${expanded ? ' expanded' : ''}`} overlayClassName="roster-overlay">
         <div className="roster-modal-header">
           <h2 id={titleId} className="roster-modal-title">{t('{name} — class lists', { name: variantName(solution.label) })}</h2>
           <button type="button" className="pill-btn" aria-expanded={expanded} onClick={() => setExpanded((v) => !v)}>
             {expanded ? <CollapseIcon /> : <ExpandIcon />}{expanded ? t('Collapse') : t('Expand')}
           </button>
-          <button type="button" className="roster-close" aria-label={t('Close')} onClick={onClose}>✕</button>
+          <button type="button" className="roster-close" aria-label={t('Close')} onClick={onClose}><span aria-hidden>✕</span></button>
         </div>
 
-        {loadingStudents ? <div className="spinner" /> : !expanded ? (
+        {studentsFailed ? (
+          <ErrorState message={loadErrorMessage(studentsError, 'We couldn’t load the students.')} onRetry={() => refetchStudents()} retrying={refetchingStudents} />
+        ) : loadingStudents ? <div className="spinner" /> : !expanded ? (
           <div className="roster-compact">
             {classes.map((c) => (
               <section key={c.classNumber} className="roster-block" aria-label={classLabel(c.classNumber)}>
@@ -184,7 +162,15 @@ export default function RosterModal({ solution, onClose }: { solution: Solution;
               </div>
             </section>
             <section className="roster-col">
-              <div className="roster-col-head"><h3 className="caps-label">{t('Preference map')}</h3></div>
+              <div className="roster-col-head">
+                <h3 className="caps-label">
+                  {t('Preference map')}
+                  <HelpTip text={t('Lines join “together” pairs; “separate” rules aren’t drawn.')} />
+                </h3>
+              </div>
+              {constraintsFailed && (
+                <ErrorState compact message={loadErrorMessage(constraintsError, 'We couldn’t load the preferences, so no lines are drawn.')} onRetry={() => refetchConstraints()} retrying={refetchingConstraints} />
+              )}
               <PreferenceMap classes={classes} pairs={pairs} names={names} />
             </section>
             <p className="roster-fullpage">
@@ -192,7 +178,6 @@ export default function RosterModal({ solution, onClose }: { solution: Solution;
             </p>
           </div>
         )}
-      </div>
-    </div>
+    </Modal>
   );
 }
