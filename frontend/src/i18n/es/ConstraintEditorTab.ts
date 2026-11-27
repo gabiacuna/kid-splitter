@@ -11,6 +11,7 @@ export default {
   'Couldn’t save this rule. Check it and try again.': 'No se pudo guardar esta regla. Revísala e inténtalo de nuevo.',
   'Failed to delete. Try again.': 'No se pudo eliminar. Inténtalo de nuevo.',
   'Conflict {n}': 'Conflicto {n}',
+  'Other rules ({n})': 'Resto de reglas ({n})',
   'Student A': 'Alumno A',
   'Student B': 'Alumno B',
   'Student': 'Alumno',
@@ -29,10 +30,10 @@ export default {
   'Maximum in class': 'Máximo en la clase',
   'Choose a student, a tag and a maximum — it saves once complete.': 'Elige un alumno, una etiqueta y un máximo: se guarda cuando esté completa.',
   'Choose a student — it saves once complete.': 'Elige un alumno: se guarda cuando esté completa.',
-  '{n} contradiction found — resolve before solving.': '{n} contradicción encontrada — resuélvela antes de generar.',
-  '{n} contradictions found — resolve before solving.': '{n} contradicciones encontradas — resuélvelas antes de generar.',
-  '{n} preference conflict — the solver will have to break some preferences.': '{n} conflicto de preferencias — el generador tendrá que incumplir algunas preferencias.',
-  '{n} preference conflicts — the solver will have to break some preferences.': '{n} conflictos de preferencias — el generador tendrá que incumplir algunas preferencias.',
+  '{n} contradiction found — resolve before solving.': '{n} contradicción entre reglas obligatorias: resuélvela antes de generar las listas.',
+  '{n} contradictions found — resolve before solving.': '{n} contradicciones entre reglas obligatorias: resuélvelas antes de generar las listas.',
+  '{n} preference conflict — the solver will have to break some preferences.': '{n} choque entre preferencias: las listas tendrán que dejar alguna sin cumplir.',
+  '{n} preference conflicts — the solver will have to break some preferences.': '{n} choques entre preferencias: las listas tendrán que dejar alguna sin cumplir.',
   'Hide': 'Ocultar',
   'Why?': '¿Por qué?',
   '(hard)': '(obligatoria)',
@@ -49,4 +50,17 @@ export default {
   'Advanced: class-size and tag limits ({n})': 'Avanzado: tamaño de clase y límites por etiqueta ({n})',
   'Rules about a single student — e.g. a smaller class, or at most N classmates with a given tag.': 'Reglas para un solo alumno, p. ej. una clase más pequeña, o como máximo N compañeros con una etiqueta.',
   '+ Add advanced rule': '+ Añadir regla avanzada',
+  // Conflict explanations ("¿Por qué?"), built from the conflict's type + params.
+  '{names} and {n} more': '{names} y {n} más',
+  '{names} and {last}': '{names} y {last}',
+  '{a} and {b} must be together, but must also be apart. Remove one of these two rules.':
+    '{a} y {b} deben ir juntos, pero también separados. Elimina una de estas dos reglas.',
+  '{a} and {b} must be apart, but “must be together” rules link them ({path}), so they would land in the same class. Remove one of these rules.':
+    '{a} y {b} deben ir separados, pero unas reglas de «juntos» obligatorias los unen ({path}), así que acabarían en la misma clase. Elimina una de estas reglas.',
+  '{n} students are linked by “must be together” rules ({names}), but a class holds at most {max}. Remove one of these rules or add a class.':
+    '{n} alumnos están unidos por reglas de «juntos» obligatorias ({names}), pero en una clase caben como máximo {max}. Elimina una de estas reglas o añade una clase.',
+  'These {n} “must be apart” rules (between {names}) need more than {k} classes, and you have {k}. No single rule is to blame: add a class, or remove one of these rules.':
+    'Estas {n} reglas de «separados» obligatorias (entre {names}) necesitan más de {k} clases, y tienes {k}. No hay una sola regla culpable: añade una clase o elimina alguna de estas reglas.',
+  '{a} and {b} prefer to be together, and so do {b} and {c}, but {a} and {c} prefer to be apart. The lists will have to leave out one of these preferences.':
+    '{a} y {b} prefieren ir juntos, y también {b} y {c}, pero {a} y {c} prefieren ir separados. Las listas tendrán que dejar alguna de estas preferencias sin cumplir.',
 } satisfies Record<string, string>;

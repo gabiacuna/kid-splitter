@@ -4,13 +4,12 @@ from datetime import datetime, timezone
 
 import httpx
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
-from slowapi import Limiter
-from slowapi.util import get_remote_address
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_db
 from ..dependencies import current_teacher
+from ..limiter import limiter
 from ..models.cohort import Cohort
 from ..models.solution import ClassAssignment, Solution
 from ..models.student import Student
@@ -26,7 +25,6 @@ from ..services.supabase_auth import (
 from .auth import _COOKIE_OPTS, SUPABASE_ANON_KEY, SUPABASE_URL, _set_auth_cookies, _supabase_post
 
 router = APIRouter(prefix="/account", tags=["account"])
-limiter = Limiter(key_func=get_remote_address)
 
 # Server-only admin key (Supabase dashboard → Project Settings → API Keys → Secret keys).
 # Needed only to delete the login itself; everything else works without it.

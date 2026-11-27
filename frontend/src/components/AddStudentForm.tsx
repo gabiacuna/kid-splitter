@@ -1,15 +1,19 @@
-import { useRef, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../lib/api';
-import type { Gender } from '../lib/types';
+import type { Gender, Student } from '../lib/types';
 import { genderLabel } from '../lib/gender';
 import { useT } from '../i18n';
+import { useToast } from './Toast';
+import HelpTip from './HelpTip';
 
 const TAG_REGEX = /^[a-z0-9-]+$/;
 
 export default function AddStudentForm({ cohortId }: { cohortId: string }) {
   const t = useT();
+  const id = useId();
   const qc = useQueryClient();
+  const { showToast } = useToast();
   const firstRef = useRef<HTMLInputElement>(null);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -22,7 +26,8 @@ export default function AddStudentForm({ cohortId }: { cohortId: string }) {
 
   const mutation = useMutation({
     mutationFn: (body: object) => api.post(`/cohorts/${cohortId}/students`, body).then((r) => r.data),
-    onSuccess: () => {
+    onSuccess: (created: Student) => {
+      showToast(t('{name} added.', { name: `${created.first_name} ${created.last_name}` }), 'success');
       qc.invalidateQueries({ queryKey: ['students', cohortId] });
       qc.invalidateQueries({ queryKey: ['cohorts'] });
       setFirstName(''); setLastName(''); setTags([]); setGender(null); setErrors({}); setServerError('');
@@ -60,22 +65,22 @@ export default function AddStudentForm({ cohortId }: { cohortId: string }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} style={{ background: 'var(--card)', border: '1.5px solid var(--border)', borderRadius: 'var(--r-sm)', padding: 16, display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 16 }}>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+    <form onSubmit={handleSubmit} noValidate aria-label={t('Add student')} style={{ background: 'var(--card)', border: '1.5px solid var(--border)', borderRadius: 'var(--r-sm)', padding: 16, display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 16 }}>
+      <div className="form-grid-2">
         <div className="form-field">
-          <label className="form-label">{t('First name *')}</label>
-          <input ref={firstRef} type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} maxLength={100} disabled={mutation.isPending} placeholder={t('Alice')} />
+          <label className="form-label" htmlFor={`${id}-first`}>{t('First name *')}</label>
+          <input id={`${id}-first`} aria-invalid={!!errors.firstName} ref={firstRef} type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} maxLength={100} disabled={mutation.isPending} placeholder={t('Alice')} />
           {errors.firstName && <span className="form-error">{errors.firstName}</span>}
         </div>
         <div className="form-field">
-          <label className="form-label">{t('Last name *')}</label>
-          <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} maxLength={100} disabled={mutation.isPending} placeholder={t('Smith')} />
+          <label className="form-label" htmlFor={`${id}-last`}>{t('Last name *')}</label>
+          <input id={`${id}-last`} aria-invalid={!!errors.lastName} type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} maxLength={100} disabled={mutation.isPending} placeholder={t('Smith')} />
           {errors.lastName && <span className="form-error">{errors.lastName}</span>}
         </div>
       </div>
       <div className="form-field">
-        <span className="form-label" id="add-student-gender">{t('Gender')}</span>
-        <div className="dist-toggle" role="radiogroup" aria-labelledby="add-student-gender" style={{ alignSelf: 'flex-start' }}>
+        <span className="form-label" id={`${id}-gender`}>{t('Gender')}</span>
+        <div className="dist-toggle" role="radiogroup" aria-labelledby={`${id}-gender`} style={{ alignSelf: 'flex-start' }}>
           {(['boy', 'girl', null] as Gender[]).map((value) => [value, genderLabel(value, t('Not specified'))] as const).map(([value, label]) => (
             <button
               key={label}
@@ -92,16 +97,22 @@ export default function AddStudentForm({ cohortId }: { cohortId: string }) {
         </div>
       </div>
       <div className="form-field">
-        <label className="form-label">{t('Tags (optional)')}</label>
+        <label className="form-label" htmlFor={`${id}-tag`}>
+          {t('Tags (optional)')}
+          <HelpTip text={t('Free labels (e.g. “support”) for group rules.')} />
+        </label>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center' }}>
           {tags.map((tag) => (
             <span key={tag} className="tag-pill">
               {tag}
-              <button type="button" onClick={() => setTags((prev) => prev.filter((x) => x !== tag))}>×</button>
+              <button type="button" aria-label={t('Remove tag {tag}', { tag })} onClick={() => setTags((prev) => prev.filter((x) => x !== tag))}>
+                <span aria-hidden>×</span>
+              </button>
             </span>
           ))}
           {tags.length < 10 && (
             <input
+              id={`${id}-tag`}
               type="text"
               value={tagInput}
               onChange={(e) => setTagInput(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
@@ -114,7 +125,7 @@ export default function AddStudentForm({ cohortId }: { cohortId: string }) {
           )}
         </div>
       </div>
-      {serverError && <span className="form-error">{serverError}</span>}
+      {serverError && <span className="form-error" role="alert">{serverError}</span>}
       <div style={{ display: 'flex', gap: 8 }}>
         <button type="submit" className="btn btn-primary" disabled={mutation.isPending}>
           {mutation.isPending ? t('Adding…') : t('Add student')}

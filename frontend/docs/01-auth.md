@@ -21,7 +21,9 @@ Global context. Wrap the entire app in this provider.
 interface AuthContextValue {
   teacher: Teacher | null;   // null = not authenticated or loading
   isLoading: boolean;        // true while /auth/me is in flight on mount
+  status: 'loading' | 'ready' | 'unreachable';
   logout: () => Promise<void>;
+  retry: () => void;         // re-run the /auth/me check after an outage
 }
 
 interface Teacher {
@@ -32,7 +34,9 @@ interface Teacher {
 ```
 
 **Behavior:**
-- On mount, call `GET /auth/me`. If 200 → set `teacher`. If 401 → set `teacher = null`.
+- On mount, call `GET /auth/me`. If 200 → set `teacher`. If 401 → try `POST /auth/refresh` once and retry; only a failed refresh means `teacher = null`.
+- Network error or 5xx → `status = 'unreachable'` (not "logged out"): protected pages show a connection error with Retry instead of redirecting to `/login`.
+- `auth:logout` (refresh failed mid-session) → navigate to `/login` with `state.sessionExpired`, which shows "Your session expired. Please sign in again." 
 - `logout()` calls `POST /auth/logout`, then sets `teacher = null` and navigates to `/login`.
 - Expose via `useAuth()` hook in `src/hooks/useAuth.ts`.
 
@@ -102,6 +106,7 @@ Wraps all authenticated routes.
 
 **Behavior:**
 - While `isLoading` is true: render a full-page centered spinner.
+- If `status === 'unreachable'`: render a "We can't connect" screen with Retry.
 - If `teacher === null` (after loading completes): redirect to `/login`.
 - Otherwise: render children.
 
@@ -115,6 +120,10 @@ Wraps all authenticated routes.
 | Login | `POST /auth/login` | `{ email, password }` | 200 + `Teacher` | 401 → invalid credentials |
 | Register | `POST /auth/register` | `{ email, password, school_name }` | 201 | 409 → email taken |
 | Logout | `POST /auth/logout` | — | 200 | Any error → still clear local state |
+| Forgot password | `POST /auth/forgot-password` | `{ email }` | 200, same answer whether or not the email exists | 429 rate limit (5/hour/IP) |
+| Reset password | `POST /auth/reset-password` | `{ access_token, new_password }` (token from the recovery link's URL fragment) | 204 | 400 `link_expired`, 422 weak/same password |
+
+**Password reset flow.** `/login` → "Forgot your password?" → `/forgot-password` → backend calls Supabase `POST /auth/v1/recover?redirect_to=<FRONTEND_URL>/reset-password` → email link → `/reset-password#access_token=…&type=recovery` → the page drops the token from the URL and posts it with the new password. Requires `<FRONTEND_URL>/reset-password` in Supabase → Authentication → URL Configuration → Redirect URLs (see `docs/TODO.md`).
 
 Cookies are set by the server (`httpOnly`). The frontend does not touch them directly.
 

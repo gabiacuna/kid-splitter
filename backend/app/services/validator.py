@@ -28,7 +28,8 @@ class ConflictGroup:
     severity:       str          # "hard" (blocks solving) | "soft" (advisory)
     constraint_ids: list[str]
     student_ids:    list[str]
-    explanation:    str
+    explanation:    str          # English, for logs/API clients; the UI builds its own from type+params
+    params:         dict = field(default_factory=dict)  # ids/counts the UI needs to phrase `explanation`
 
 
 
@@ -134,8 +135,8 @@ def detect_conflicts(
     names: Optional[dict[str, str]] = None,
 ) -> list[ConflictGroup]:
     n = _Names(names or {})
-    hard_groups: list[tuple[str, list[str], list[str], str]] = []  # (type, cids, sids, text)
-    soft_groups: list[tuple[str, list[str], list[str], str]] = []
+    hard_groups: list[tuple[str, list[str], list[str], str, dict]] = []  # (type, cids, sids, text, params)
+    soft_groups: list[tuple[str, list[str], list[str], str, dict]] = []
     max_class_size = ceil(total_students / num_classes) if num_classes else 0
 
     hard = [c for c in binary_constraints if c.is_hard]
@@ -154,6 +155,7 @@ def detect_conflicts(
         hard_groups.append((
             "direct_conflict", cids, [a, b],
             f"{n.one(a)} and {n.one(b)} must be together, but must also be apart. Remove one of these two rules.",
+            {"a": a, "b": b},
         ))
 
     # Together clusters (hard).
@@ -178,6 +180,7 @@ def detect_conflicts(
                 f"{len(members)} students are linked by “must be together” rules "
                 f"({n.many(members)}), but a class holds at most {max_class_size}. "
                 f"Remove one of these rules or add a class.",
+                {"students": sorted(members), "max_size": max_class_size},
             ))
 
     # 3. Chain conflict: must be apart, but linked by a chain of must-be-together rules.
@@ -198,6 +201,7 @@ def detect_conflicts(
                 f"{n.one(a)} and {n.one(b)} must be apart, but “must be together” rules link them "
                 f"({' → '.join(n.one(s) for s in path)}), so they would land in the same class. "
                 f"Remove one of these rules.",
+                {"a": a, "b": b, "path": path},
             ))
         else:
             contracted_edges[(min(ra, rb), max(ra, rb))].extend(cs)
@@ -226,6 +230,7 @@ def detect_conflicts(
             f"These {len(sep_ids)} “must be apart” rules (between {n.many(students)}) together need more than "
             f"{num_classes} classes, and you have {num_classes}. No single rule is to blame: "
             f"add a class, or remove one of these rules.",
+            {"rules": len(sep_ids), "students": sorted(students), "classes": num_classes},
         ))
 
     # 5. Soft warning: A~B and B~C prefer together, but A~C prefers apart.
@@ -255,15 +260,16 @@ def detect_conflicts(
                     f"{n.one(x)} and {n.one(mid)} prefer to be together, and so do {n.one(mid)} and "
                     f"{n.one(other)}, but {n.one(x)} and {n.one(other)} prefer to be apart. "
                     f"The solver will have to break one of these preferences.",
+                    {"a": x, "mid": mid, "c": other},
                 ))
 
     groups: list[ConflictGroup] = []
     for severity, items in (("hard", hard_groups), ("soft", soft_groups)):
-        for type_, cids, sids, text in items:
+        for type_, cids, sids, text, params in items:
             groups.append(ConflictGroup(
                 id=len(groups) + 1, type=type_, severity=severity,
                 constraint_ids=list(dict.fromkeys(cids)), student_ids=list(dict.fromkeys(sids)),
-                explanation=text,
+                explanation=text, params=params,
             ))
     return groups
 

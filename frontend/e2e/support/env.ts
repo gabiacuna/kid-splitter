@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
 export const APP_URL = process.env.E2E_APP_URL ?? 'http://localhost:5173';
-export const API_URL = process.env.E2E_API_URL ?? 'http://localhost:8000';
+export const API_URL = process.env.E2E_API_URL ?? 'http://localhost:8000/api';
 
 const DIR = path.dirname(new URL(import.meta.url).pathname);
 export const E2E_DIR = path.resolve(DIR, '..');

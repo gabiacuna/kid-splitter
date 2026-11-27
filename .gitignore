@@ -10,3 +10,8 @@ __pycache__/
 # Real student data used for manual import testing — never commit
 *.csv
 !**/fixtures/**/*.csv
+
+# Local agent skills and configuration
+.agents/
+.claude/
+skills-lock.json

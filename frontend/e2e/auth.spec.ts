@@ -1,5 +1,5 @@
 import { test, expect } from './support/fixtures';
-import { APP_URL, credentials } from './support/env';
+import { API_URL, APP_URL, credentials } from './support/env';
 
 // Fresh, logged-out visitor with English pinned (selectors are English).
 test.use({ allowHttpErrors: true, storageState: { cookies: [], origins: [{ origin: APP_URL, localStorage: [{ name: 'lang', value: 'en' }] }] } });
@@ -18,7 +18,7 @@ test('login: success shows the nav without a reload; wrong password is a clear e
   await page.waitForURL('**/cohorts');
   // Login used to store the whole { teacher } response as the teacher, so the nav had
   // no school name until a reload re-fetched /auth/me.
-  const school = (await (await page.request.get('http://localhost:8000/auth/me')).json()).school_name;
+  const school = (await (await page.request.get(`${API_URL}/auth/me`)).json()).school_name;
   await expect(page.locator('.nav-school')).toHaveText(school);
 });
 
@@ -75,4 +75,49 @@ test('register: "Check your email" screen offers resend; rate limit is explained
   await page.getByRole('button', { name: 'Resend confirmation email' }).click();
   await expect(page.getByText(/Too many emails requested/)).toBeVisible();
   await expect(page.getByRole('button', { name: /Resend available in \d+s/ })).toBeDisabled();
+});
+
+// Forgot / reset password: mocked, so no real email is sent and no password changes.
+test('forgot password: link on login, neutral confirmation, change email', async ({ page }) => {
+  const sent: string[] = [];
+  await page.route('**/auth/forgot-password', async (r) => {
+    sent.push(r.request().postDataJSON().email);
+    await r.fulfill(json(200, { detail: 'ok' }));
+  });
+  await page.goto('/login');
+  await page.getByRole('link', { name: 'Forgot your password?' }).click();
+  await page.waitForURL('**/forgot-password');
+  await page.getByLabel('Email').fill('teacher@example.com');
+  await page.getByRole('button', { name: 'Send reset link' }).click();
+  await expect(page.getByText(/If teacher@example\.com has an account/)).toBeVisible();
+  expect(sent).toEqual(['teacher@example.com']);
+  await page.getByRole('button', { name: 'Use a different email' }).click();
+  await expect(page.getByLabel('Email')).toBeVisible();
+});
+
+test('reset password: token from the link is used, then removed from the URL; expired link offers a new one', async ({ page }) => {
+  const bodies: unknown[] = [];
+  await page.route('**/auth/reset-password', async (r) => {
+    bodies.push(r.request().postDataJSON());
+    await r.fulfill({ status: 204, body: '' });
+  });
+  await page.goto('/reset-password#access_token=recovery-token&type=recovery');
+  await expect(page).toHaveURL(/\/reset-password$/);
+  await page.getByLabel('New password', { exact: true }).fill('a-brand-new-password');
+  await page.getByLabel('Confirm new password').fill('a-brand-new-password');
+  await page.getByRole('button', { name: 'Update password' }).click();
+  await expect(page.getByText('Sign in with your new password.')).toBeVisible();
+  expect(bodies).toEqual([{ access_token: 'recovery-token', new_password: 'a-brand-new-password' }]);
+
+  await page.goto('/reset-password#error=access_denied&error_code=otp_expired');
+  await expect(page.getByText('This link has expired')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Send me a new link' })).toHaveAttribute('href', '/forgot-password');
+});
+
+test('login and register pages have a language switch', async ({ page }) => {
+  await page.goto('/login');
+  await page.getByRole('button', { name: 'Español' }).click();
+  await expect(page.getByRole('heading', { name: 'Bienvenido de nuevo' })).toBeVisible();
+  await page.getByRole('button', { name: 'English' }).click();
+  await expect(page.getByRole('heading', { name: 'Welcome back' })).toBeVisible();
 });

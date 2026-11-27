@@ -6,11 +6,11 @@ from concurrent.futures import ThreadPoolExecutor
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from slowapi import Limiter
 from slowapi.util import get_remote_address
 
 from ..db import get_db
 from ..dependencies import current_teacher, get_cohort_or_403, get_solution_or_403
+from ..limiter import limiter
 from ..models.cohort import Cohort
 from ..models.student import Student
 from ..models.constraint import BinaryConstraint, UnaryConstraint
@@ -23,7 +23,6 @@ from ..services.validator import detect_conflicts, short_display_names
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["solve"])
-limiter = Limiter(key_func=lambda request: request.state.teacher_id if hasattr(request.state, "teacher_id") else get_remote_address(request))
 _executor = ThreadPoolExecutor(max_workers=4)
 
 
