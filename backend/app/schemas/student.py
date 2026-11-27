@@ -76,12 +76,53 @@ class StudentUpdate(BaseModel):
         return validate_tags(v)
 
 
+MAX_PREFERENCE_KEYS = 20
+MAX_IMPORT_ROWS = 600  # 500-row upload plus students added from preference names
+
+
+def validate_keys(keys: list[str]) -> list[str]:
+    if len(keys) > MAX_PREFERENCE_KEYS:
+        raise ValueError(f"Max {MAX_PREFERENCE_KEYS} preferences per student")
+    for k in keys:
+        if not k or len(k) > 64:
+            raise ValueError("Invalid preference key")
+    return keys
+
+
 class ImportStudent(StudentCreate):
-    preferences: list[str] = []   # classmate names; resolved server-side into soft "together" constraints
+    row_index:       int
+    # Resolved candidates from the preview: a student id of this cohort, or "row:<row_index>"
+    # of another row in this request. Each becomes a soft "together" rule.
+    preference_keys: list[str] = []
+
+    @field_validator("preference_keys")
+    @classmethod
+    def clean_keys(cls, v): return validate_keys(v)
+
+
+class ExistingPreferences(BaseModel):
+    """A row that duplicates a student already in the cohort but lists new preferences:
+    no new student, the preferences are added to the existing one."""
+    student_id:      str
+    preference_keys: list[str] = []
+
+    @field_validator("preference_keys")
+    @classmethod
+    def clean_keys(cls, v): return validate_keys(v)
 
 
 class ImportConfirmRequest(BaseModel):
-    students: list[ImportStudent]
+    students:             list[ImportStudent]
+    existing_preferences: list[ExistingPreferences] = []
+
+    @field_validator("students")
+    @classmethod
+    def unique_rows(cls, v: list[ImportStudent]):
+        if len(v) > MAX_IMPORT_ROWS:
+            raise ValueError(f"Max {MAX_IMPORT_ROWS} students per import")
+        if len({s.row_index for s in v}) != len(v):
+            raise ValueError("row_index must be unique")
+        return v
 
 
 class StudentOut(BaseModel):
@@ -97,17 +138,38 @@ class StudentOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class CandidateOut(BaseModel):
+    key:       str                                # student id, or "row:<row_index>"
+    display:   str
+    source:    Literal["existing", "upload"]
+    row_index: Optional[int] = None
+
+
 class PreferenceMatchOut(BaseModel):
     name:            str
     status:          Literal["matched", "ambiguous", "unresolved"]
+    matched_key:     Optional[str] = None
     matched_display: Optional[str] = None
-    suggestions:     list[str] = []
+    suggestions:     list[CandidateOut] = []
 
 
 class ColumnNoteOut(BaseModel):
     column: str
     action: Literal["tags", "ignored"]
     detail: str
+    code:   str = ""
+    params: dict[str, str] = {}
+
+
+class NameSplitOut(BaseModel):
+    column:        str
+    order:         Literal["surname_first", "given_first"]
+    example_full:  str
+    example_first: str
+    example_last:  str
+
+
+ImportStatus = Literal["ok", "duplicate_exact", "duplicate_similar", "missing_name", "invalid_tag", "invalid_gender"]
 
 
 class ImportPreviewRow(BaseModel):
@@ -116,9 +178,12 @@ class ImportPreviewRow(BaseModel):
     last_name:      str
     tags:           list[str]
     gender:         Optional[Gender] = None
-    status:         str
-    status_message: Optional[str] = None
-    importable:     bool = True   # decided by the server; the client imports exactly these rows
+    status:         ImportStatus
+    status_message: Optional[str] = None           # English; the UI uses status_code + status_params
+    status_code:    Optional[str] = None
+    status_params:  dict[str, str] = {}
+    importable:     bool = True   # imported unless the teacher unticks it (duplicate_exact defaults to False)
+    existing_student_id: Optional[str] = None      # duplicate_exact of this cohort student
     preferences:    list[PreferenceMatchOut] = []
 
 
@@ -130,6 +195,7 @@ class ImportPreviewResponse(BaseModel):
     preferences_matched:    int
     preferences_unresolved: int
     column_notes:           list[ColumnNoteOut] = []
+    name_split:             Optional[NameSplitOut] = None
 
 
 class RosterRow(BaseModel):
@@ -145,6 +211,20 @@ class RematchRequest(BaseModel):
     rows:           list[RosterRow]
 
 
+class ExistingUpdated(BaseModel):
+    student_id:          str
+    display:             str
+    constraints_created: int
+
+
+class SkippedPreferenceOut(BaseModel):
+    owner:      str
+    target_key: str
+    reason:     Literal["target_not_imported", "unknown_student"]
+
+
 class ImportConfirmResponse(BaseModel):
     students:            list[StudentOut]
     constraints_created: int
+    existing_updated:    list[ExistingUpdated] = []
+    skipped_preferences: list[SkippedPreferenceOut] = []
