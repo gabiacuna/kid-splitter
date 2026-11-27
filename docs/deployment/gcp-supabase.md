@@ -98,6 +98,7 @@ Migrations are **opt-in** and off by default. `backend/alembic/env.py` reads `DA
   Alternatively, deploy with `RUN_MIGRATIONS=true` and the port-5432 `DATABASE_URL` for that run.
 - In **Supabase Dashboard → Authentication → URL Configuration**:
   - Set **Site URL** to the Cloud Run service URL (`https://kid-splitter-<hash>-uc.a.run.app`).
+  - Under **Redirect URLs**, add `<FRONTEND_URL>/reset-password` (the production URL, and `http://localhost:5173/reset-password` for local dev). Without it the password-reset email links to the Site URL instead of the reset page.
 
 ### 2. Cloud Run Service Settings (Always-Free Tier eligible)
 - **Region**: `us-central1` (Iowa) or `us-east1` (South Carolina) — Tier 1 regions required for the Cloud Run Always Free quota.
@@ -120,3 +121,19 @@ Migrations are **opt-in** and off by default. `backend/alembic/env.py` reads `DA
   - **Schedule**: `0 9 */3 * *` (every 3 days at 09:00 UTC)
   - **Target**: `GET https://kid-splitter-<hash>-uc.a.run.app/api/health/ready`
 - Verification: `GET /api/health/ready` runs `SELECT 1` on Supabase Postgres and returns `{"status": "ok"}`. `GET /api/health` returns `{"status": "ok"}` without touching the database.
+
+---
+
+## CI/CD: deploy on merge to `main`
+
+`.github/workflows/ci.yml` runs the checks on every PR to `main` and push to `main`/`develop`. On a push to `main`, once the checks pass, its `deploy` job runs `./deploy.sh` in the GitHub environment `production`. It authenticates with Workload Identity Federation, so there is no service-account key to store.
+
+One-time setup, from a machine with `gcloud` and `gh` logged in (project owner and repo admin):
+
+```bash
+./scripts/setup-cicd.sh
+```
+
+It enables the required APIs, creates the `github-deployer` service account with the roles `deploy.sh` needs, creates a Workload Identity pool and provider limited to this repository, then creates the `production` environment and sets `GCP_WORKLOAD_IDENTITY_PROVIDER`, `GCP_SERVICE_ACCOUNT` and `GCP_PROJECT_ID` on it. Re-running it is safe. Override defaults with `PROJECT_ID`, `REPO`, `POOL`, `PROVIDER`, `SA_NAME`.
+
+Migrations are not part of the pipeline: run `alembic upgrade head` against the direct connection (port `5432`) before merging a change that adds one, or deploy once with `RUN_MIGRATIONS=true`.
