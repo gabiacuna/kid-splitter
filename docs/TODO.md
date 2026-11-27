@@ -2,6 +2,17 @@
 
 Things to do later that aren't planned features yet. Newest first.
 
+- [ ] **Configure the password-reset redirect in Supabase** (added 2026-11-24).
+  "Forgot password" (`POST /auth/forgot-password` → `/reset-password`, see
+  `docs/design-review/01-ui-pass.md`) sends Supabase's recovery email with
+  `redirect_to=<FRONTEND_URL>/reset-password`. Supabase only honours redirect URLs on its
+  allow-list, so in the dashboard go to **Authentication → URL Configuration → Redirect URLs**
+  and add `http://localhost:5173/reset-password` and the production
+  `<FRONTEND_URL>/reset-password`. Make sure `FRONTEND_URL` is set in the backend environment.
+  Then check with a real account: the email arrives, the link opens the reset page (not the
+  Site URL), the new password works, and an expired/used link shows "This link has expired".
+  The Playwright tests only cover this flow with mocked responses.
+
 - [ ] **Verify real account deletion and password change against Supabase** (added 2026-11-23).
   `POST /account/delete` and `POST /account/password` are mocked in the Playwright suite so the
   shared test teacher isn't mutated or deleted. Using a throwaway account (with
