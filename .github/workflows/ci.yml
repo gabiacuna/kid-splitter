@@ -4,11 +4,12 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [dev, develop]
+    branches: [main, dev, develop]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Never cancel a run on main: it may be mid-deploy.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   check:
@@ -28,11 +29,12 @@ jobs:
 
       - name: Install backend dependencies & run unit tests
         working-directory: backend
+        env:
+          # app.db reads this at import time; the tests never open a connection.
+          DATABASE_URL: postgresql+asyncpg://postgres:ci@localhost:5432/ci
         run: |
-          uv sync --frozen --no-dev
-          uv run python tests/test_supabase_auth.py
-          uv run python tests/test_account_export.py
-          uv run python tests/test_export.py
+          uv sync --frozen
+          uv run pytest
 
       - name: Set up Node 22
         uses: actions/setup-node@v4
@@ -48,3 +50,32 @@ jobs:
           npx tsc --noEmit
           npx tsc --noEmit -p e2e/tsconfig.json
           npm run build
+
+  deploy:
+    name: deploy
+    # Only after a merge to main, and only if the checks above passed.
+    needs: check
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+      id-token: write   # Workload Identity Federation (no long-lived JSON key)
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      # deploy.sh checks the Secret Manager secrets, then runs `gcloud run deploy --source .`
+      # (Cloud Build uses the Dockerfile). Defaults: project kid-splitter-prod, us-central1.
+      - name: Deploy to Cloud Run
+        env:
+          PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+        run: ./deploy.sh --quiet

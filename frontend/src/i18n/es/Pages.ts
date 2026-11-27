@@ -16,7 +16,7 @@ export default {
   '{n} classes': '{n} clases',
   'Students': 'Alumnos',
   'Constraints': 'Preferencias',
-  'Solutions': 'Opciones',
+  'Solutions': 'Listas de clase',
   // pages/RegisterPage.tsx
   'School name is required.': 'El nombre del colegio es obligatorio.',
   'Enter a valid email.': 'Escribe un correo electrónico válido.',
@@ -60,6 +60,21 @@ export default {
   'Signing in…': 'Iniciando sesión…',
   'Don\'t have an account?': '¿No tienes una cuenta?',
   'Sign up': 'Crear cuenta',
+  // pages/ForgotPasswordPage.tsx, pages/ResetPasswordPage.tsx
+  'Forgot your password?': '¿Olvidaste tu contraseña?',
+  'Enter your email and we’ll send you a link to choose a new one.': 'Escribe tu correo y te enviaremos un enlace para elegir una nueva.',
+  'Send reset link': 'Enviar enlace',
+  'If {email} has an account, we’ve sent a link to choose a new password. It can take a few minutes — check your spam folder too.':
+    'Si {email} tiene una cuenta, te enviamos un enlace para elegir una contraseña nueva. Puede tardar unos minutos; revisa también la carpeta de spam.',
+  'Use a different email': 'Usar otro correo',
+  'Wrong email? Change it': '¿Correo equivocado? Cámbialo',
+  'Choose a new password': 'Elige una contraseña nueva',
+  'At least 8 characters.': 'Al menos 8 caracteres.',
+  'Sign in with your new password.': 'Inicia sesión con tu nueva contraseña.',
+  'This link has expired': 'Este enlace ha caducado',
+  'Reset links work once and only for a short time. Ask for a new one.': 'Los enlaces para cambiar la contraseña sirven una sola vez y por poco tiempo. Pide uno nuevo.',
+  'Open this page from the link in the reset email. If it doesn’t work, ask for a new one.': 'Abre esta página desde el enlace del correo. Si no funciona, pide uno nuevo.',
+  'Send me a new link': 'Envíame un enlace nuevo',
   // pages/PublicSharePage.tsx
   'This link is no longer available.': 'Este enlace ya no está disponible.',
   'Something went wrong. Try again later.': 'Algo salió mal. Inténtalo más tarde.',

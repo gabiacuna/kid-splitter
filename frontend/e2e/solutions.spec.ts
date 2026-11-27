@@ -51,6 +51,8 @@ test('solutions: no gender data hides the gender section; cards stack when narro
   await expect(page.getByText('Boy / girl balance')).toHaveCount(0);
   await expect(page.locator('.gender-legend')).toHaveCount(0);
   await expect(page.locator('.gender-disclosure')).toHaveCount(0);
+  // The solve panel starts from the class count chosen for the cohort (2 here), not a fixed 3.
+  await expect(page.locator('input[type="number"][max="4"]')).toHaveValue('2');
 
   await page.setViewportSize({ width: 600, height: 1000 });
   expect(await page.locator('.solution-cards').first().evaluate((e) => getComputedStyle(e).flexDirection)).toBe('column');

@@ -1,0 +1,24 @@
+# Without this file, `gcloud run deploy --source` derives ignores from .gitignore,
+# which would upload backend/.venv and the UI zip. Keep in sync with .dockerignore.
+.gcloudignore
+.git
+.gitignore
+.github/
+.agents/
+.claude/
+skills-lock.json
+docs/
+**/node_modules/
+backend/.venv/
+frontend/dist/
+frontend/e2e/.auth/
+frontend/e2e/.report/
+frontend/e2e/.results/
+**/__pycache__/
+*.pyc
+.env
+*.env
+**/.env
+*.csv
+!**/fixtures/**/*.csv
+Kid's Class Scheduler UI*

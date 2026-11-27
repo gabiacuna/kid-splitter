@@ -4,18 +4,16 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from slowapi import Limiter
-from slowapi.util import get_remote_address
 
 from ..db import get_db
 from ..dependencies import get_solution_or_403
+from ..limiter import limiter
 from ..models.cohort import Cohort
 from ..models.student import Student
 from ..models.solution import Solution, ClassAssignment
 from ..schemas.share import ShareTokenOut, PublicSolutionOut, PublicClassOut, PublicStudentOut
 
 router = APIRouter(tags=["share"])
-limiter = Limiter(key_func=get_remote_address)
 
 SHARE_BASE_URL = os.environ.get("SHARE_BASE_URL", "http://localhost:5173")
 WHITELISTED_TAGS = {"esl", "gifted", "new-student"}

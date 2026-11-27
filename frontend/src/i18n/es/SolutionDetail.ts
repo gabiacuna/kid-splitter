@@ -3,7 +3,6 @@ export default {
   '[Removed student]': '[Alumno eliminado]',
   // pages/SolutionDetailPage.tsx
   'hard': 'obligatoria',
-  'soft, w{w}': 'flexible, peso {w}',
   'together': 'juntos',
   'apart': 'separados',
   '{a} + {b}: {type} ({label})': '{a} + {b}: {type} ({label})',
@@ -20,9 +19,9 @@ export default {
   'Solution not found.': 'No se encontró la opción.',
   '← Back to class lists': '← Volver a las listas de clase',
   '⚠ This solution has {n} hard constraint violation. This indicates a solver problem — do not use this arrangement.':
-    '⚠ Esta opción incumple {n} preferencia obligatoria. Indica un problema del generador: no uses esta distribución.',
+    '⚠ Esta opción incumple {n} preferencia obligatoria. Es un error del programa: no uses esta distribución.',
   '⚠ This solution has {n} hard constraint violations. This indicates a solver problem — do not use this arrangement.':
-    '⚠ Esta opción incumple {n} preferencias obligatorias. Indica un problema del generador: no uses esta distribución.',
+    '⚠ Esta opción incumple {n} preferencias obligatorias. Es un error del programa: no uses esta distribución.',
   '⚠ {n} hard violation': '⚠ {n} preferencia obligatoria incumplida',
   '⚠ {n} hard violations': '⚠ {n} preferencias obligatorias incumplidas',
   '{n} soft unmet': 'Flexibles sin cumplir: {n}',

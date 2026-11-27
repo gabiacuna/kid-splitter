@@ -9,6 +9,9 @@ import { useT } from '../i18n';
 import Nav from '../components/Nav';
 import { useToast } from '../components/Toast';
 import { SheetIcon } from '../components/Icons';
+import Modal from '../components/Modal';
+import ErrorState from '../components/ErrorState';
+import { loadErrorMessage } from '../lib/errors';
 
 function SchoolSection() {
   const t = useT();
@@ -198,7 +201,7 @@ function DeleteAccountModal({ onClose }: { onClose: () => void }) {
   const [downloading, setDownloading] = useState(false);
   const [downloadFailed, setDownloadFailed] = useState(false);
 
-  const { data: summary } = useQuery<AccountSummary>({
+  const { data: summary, isError: summaryFailed, error: summaryError, refetch: refetchSummary, isRefetching } = useQuery<AccountSummary>({
     queryKey: ['account-summary'],
     queryFn: () => api.get('/account/summary').then((r) => r.data),
     staleTime: 0,
@@ -234,10 +237,7 @@ function DeleteAccountModal({ onClose }: { onClose: () => void }) {
   const count = (n: number, one: string, many: string) => t(n === 1 ? one : many, { n });
 
   return (
-    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && !remove.isPending && onClose()}>
-      <div className="modal" role="dialog" aria-modal="true" aria-labelledby="delete-account-title"
-        onKeyDown={(e) => e.key === 'Escape' && !remove.isPending && onClose()}>
-        <h2 className="modal-title" id="delete-account-title">{t('Delete your account?')}</h2>
+    <Modal title={t('Delete your account?')} onClose={onClose} dirty={!!password} busy={remove.isPending}>
         <p className="modal-text">{t('This permanently deletes your login and all your data. It cannot be undone:')}</p>
         {summary ? (
           <ul className="deletion-list">
@@ -246,6 +246,8 @@ function DeleteAccountModal({ onClose }: { onClose: () => void }) {
             <li>{count(summary.solutions, '{n} saved solution option', '{n} saved solution options')}</li>
             <li>{count(summary.share_links, '{n} active share link', '{n} active share links')}</li>
           </ul>
+        ) : summaryFailed ? (
+          <ErrorState compact message={loadErrorMessage(summaryError, 'We couldn’t load what will be deleted.')} onRetry={() => refetchSummary()} retrying={isRefetching} />
         ) : <div className="spinner" />}
 
         <div className="deletion-download">
@@ -273,8 +275,7 @@ function DeleteAccountModal({ onClose }: { onClose: () => void }) {
             </button>
           </div>
         </form>
-      </div>
-    </div>
+    </Modal>
   );
 }
 

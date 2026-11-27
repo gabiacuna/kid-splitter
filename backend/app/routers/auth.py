@@ -1,31 +1,38 @@
 import os
 import httpx
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
-from slowapi import Limiter
-from slowapi.util import get_remote_address
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from ..db import get_db
 from ..dependencies import current_teacher
+from ..limiter import limiter
 from ..models.teacher import Teacher
-from ..schemas.auth import RegisterRequest, LoginRequest, ResendRequest, AuthResponse, RegisterResponse, TeacherOut
-from ..services.supabase_auth import Session, login_outcome, resend_outcome, signup_outcome
+from ..schemas.auth import (
+    RegisterRequest, LoginRequest, ResendRequest, AuthResponse, RegisterResponse, TeacherOut,
+    ForgotPasswordRequest, ResetPasswordRequest,
+)
+from ..services.supabase_auth import (
+    Session, login_outcome, recover_outcome, resend_outcome, reset_password_outcome, signup_outcome,
+)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
-limiter = Limiter(key_func=get_remote_address)
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "")
+# Where the password-reset email links to. Must be listed in Supabase → Authentication →
+# URL Configuration → Redirect URLs, or Supabase falls back to the Site URL.
+FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:5173")
 
 _COOKIE_OPTS = dict(httponly=True, samesite="lax", secure=os.environ.get("ENV") == "production")
 
 
-async def _supabase_post(path: str, payload: dict) -> tuple[int, dict]:
+async def _supabase_post(path: str, payload: dict, params: dict | None = None) -> tuple[int, dict]:
     async with httpx.AsyncClient() as client:
         resp = await client.post(
             f"{SUPABASE_URL}{path}",
             json=payload,
+            params=params,
             headers={"apikey": SUPABASE_ANON_KEY, "Content-Type": "application/json"},
         )
     try:
@@ -91,6 +98,37 @@ async def resend_confirmation(request: Request, body: ResendRequest):
     status, data = await _supabase_post("/auth/v1/resend", {"type": "signup", "email": body.email})
     resend_outcome(status, data)
     return {"detail": "If this email has an unconfirmed account, a new confirmation link is on its way."}
+
+
+@router.post("/forgot-password")
+@limiter.limit("5/hour")
+async def forgot_password(request: Request, body: ForgotPasswordRequest):
+    """Send a password-reset email. The answer is the same whether or not the email has an
+    account (no probing); Supabase also rate-limits per address."""
+    status, data = await _supabase_post(
+        "/auth/v1/recover", {"email": body.email},
+        params={"redirect_to": f"{FRONTEND_URL.rstrip('/')}/reset-password"},
+    )
+    recover_outcome(status, data)
+    return {"detail": "If this email has an account, a reset link is on its way."}
+
+
+@router.post("/reset-password", status_code=204)
+@limiter.limit("10/hour")
+async def reset_password(request: Request, body: ResetPasswordRequest):
+    """Set a new password with the access token from the recovery link (in the URL fragment
+    of /reset-password). No session is created: the teacher signs in with the new password."""
+    async with httpx.AsyncClient() as client:
+        resp = await client.put(
+            f"{SUPABASE_URL}/auth/v1/user",
+            json={"password": body.new_password},
+            headers={"apikey": SUPABASE_ANON_KEY, "Authorization": f"Bearer {body.access_token}"},
+        )
+    try:
+        data = resp.json()
+    except ValueError:
+        data = {}
+    reset_password_outcome(resp.status_code, data if isinstance(data, dict) else {})
 
 
 @router.post("/refresh")

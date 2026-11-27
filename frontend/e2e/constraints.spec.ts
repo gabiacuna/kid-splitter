@@ -45,6 +45,13 @@ test('constraint editor: conflict groups, autosave, advanced rules, narrow layou
   const banner = page.locator('.conflict-banner');
   await expect(banner).toContainText('1 contradiction found — resolve before solving.');
   await expect(page.locator('.constraint-row.binary .conflict-badge')).toHaveCount(3);
+  // Conflicting rules are pulled to the top under their own heading, the rest follow.
+  const heads = page.locator('.rules-section-head');
+  await expect(heads).toHaveText(['Conflict 1', 'Other rules (2)']);
+  const firstThree = rows(page).locator('.conflict-badge');
+  for (let i = 0; i < 3; i++) await expect(rows(page).nth(i).locator('.conflict-badge')).toHaveText('1');
+  await expect(rows(page).nth(3).locator('.conflict-badge')).toHaveCount(0);
+  await expect(firstThree).toHaveCount(3);
   await expect(rowWith(page, 'Emma', 'Amara').locator('.conflict-badge')).toHaveCount(0);
   const bb = (await page.locator('.conflict-badge').first().boundingBox())!;
   expect(await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.className, { x: bb.x + bb.width / 2, y: bb.y + bb.height / 2 }))
@@ -76,17 +83,17 @@ test('constraint editor: conflict groups, autosave, advanced rules, narrow layou
   await expect(cd.locator('.weight-value')).toHaveText('10');
 
   // type + hard via keyboard
-  const typeSel = cd.locator('select.type-select');
+  const typeSel = cd.locator('button.type-chip');
   await typeSel.focus();
-  await page.keyboard.press('ArrowUp'); // separate -> together
+  await page.keyboard.press('ArrowUp'); // separate -> together (closed chip steps like a select)
   await cd.locator('.hard-check input').focus();
   await page.keyboard.press('Space');
-  await expect(typeSel).toHaveValue('together');
+  await expect(typeSel).toHaveAttribute('data-value', 'together');
   await expect(slider).toBeDisabled();
   await expect.poll(async () => { const r = await rule('Chloe', 'Daniel'); return `${r.type} ${r.is_hard}`; }).toBe('together true');
   await page.reload();
   const cdAfter = rowWith(page, 'Chloe', 'Daniel');
-  await expect(cdAfter.locator('select.type-select')).toHaveValue('together');
+  await expect(cdAfter.locator('button.type-chip')).toHaveAttribute('data-value', 'together');
   await expect(cdAfter.locator('.hard-check input')).toBeChecked();
   await expect(cdAfter.locator('.weight-value')).toHaveText('10');
 
@@ -110,11 +117,12 @@ test('constraint editor: conflict groups, autosave, advanced rules, narrow layou
   await fresh.locator('select[aria-label="Student A"]').selectOption({ label: 'Hugo Diaz' });
   await fresh.locator('select[aria-label="Student B"]').selectOption({ label: 'Fiona Lee' });
   await expect.poll(async () => !!(await rule('Hugo', 'Fiona'))).toBe(true);
-  await fresh.locator('select.type-select').selectOption('separate');
+  await fresh.locator('button.type-chip').click();
+  await page.getByRole('option', { name: 'Separate' }).click();
   await expect.poll(() => writes.filter((w) => w.startsWith('PUT')).length).toBe(1);
   expect(writes.filter((w) => w.startsWith('POST'))).toHaveLength(1);
   await page.reload();
-  await expect(rowWith(page, 'Hugo', 'Fiona').locator('select.type-select')).toHaveValue('separate');
+  await expect(rowWith(page, 'Hugo', 'Fiona').locator('button.type-chip')).toHaveAttribute('data-value', 'separate');
 
   // resolving the conflict clears the banner and badges
   await rowWith(page, 'George', 'Amara').locator('.hard-check input').uncheck();
@@ -144,4 +152,34 @@ test('constraint editor: conflict groups, autosave, advanced rules, narrow layou
   // narrow layout
   await page.setViewportSize({ width: 600, height: 900 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
+});
+
+test('rules come back alphabetically and keep their place and type after editing', async ({ page, api }) => {
+  const cohort = await api.createCohort('rule-order');
+  const ids = await api.addStudents(cohort.id, NAMES.map(([first_name, last_name]) => ({ first_name, last_name })));
+  const S: Record<string, string> = {};
+  NAMES.forEach(([f], i) => { S[f] = ids[i]; });
+  // Created out of alphabetical order on purpose.
+  await api.together(cohort.id, S.Emma, S.Fiona, { weight: 1 });
+  await api.together(cohort.id, S.Amara, S.Ben, { weight: 1 });
+  await api.together(cohort.id, S.Chloe, S.Daniel, { weight: 1 });
+
+  await page.goto(`/cohorts/${cohort.id}?tab=constraints`);
+  const order = () => rows(page).locator('select[aria-label="Student A"] option:checked').allInnerTexts();
+  await expect(rows(page)).toHaveCount(3);
+  const before = await order();
+  expect(before).toEqual(['Amara Osei', 'Chloe Reyes', 'Emma Tan']);
+
+  // Edit the first rule; before the fix, the edited rule moved to the bottom on reload.
+  await rows(page).first().locator('button.type-chip').click();
+  await page.getByRole('option', { name: 'Separate' }).click();
+  await expect.poll(async () => {
+    const { binary } = await api.get(`/cohorts/${cohort.id}/constraints`);
+    return binary.find((c: any) => c.student_a_id === S.Amara).type;
+  }).toBe('separate');
+
+  await page.reload();
+  await expect(rows(page)).toHaveCount(3);
+  expect(await order()).toEqual(before);
+  await expect(rows(page).first().locator('button.type-chip')).toHaveAttribute('data-value', 'separate');
 });

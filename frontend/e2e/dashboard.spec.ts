@@ -23,9 +23,13 @@ test('dashboard: Active/Draft cards, last solved, stable tints, one column when 
   expect(await tints()).toEqual(before);
 
   await card(solved.name).getByRole('button', { name: 'Cohort options' }).click();
-  await expect(page.getByRole('button', { name: 'Edit' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Delete' })).toBeVisible();
+  await expect(page.getByRole('menuitem', { name: 'Edit' })).toBeFocused(); // focus moves into the menu
+  await expect(page.getByRole('menuitem', { name: 'Delete' })).toBeVisible();
+  await page.keyboard.press('ArrowDown');
+  await expect(page.getByRole('menuitem', { name: 'Delete' })).toBeFocused();
   await page.keyboard.press('Escape');
+  await expect(page.getByRole('menuitem')).toHaveCount(0);
+  await expect(card(solved.name).getByRole('button', { name: 'Cohort options' })).toBeFocused();
 
   await card(solved.name).getByRole('link', { name: 'Open →' }).click();
   await expect(page).toHaveURL(new RegExp(seed.full));

@@ -39,9 +39,7 @@ Vite proxies `/api/*` requests to `http://localhost:8000`.
 ```bash
 # Backend unit tests
 cd backend
-uv run python tests/test_supabase_auth.py
-uv run python tests/test_account_export.py
-uv run python tests/test_export.py
+uv run pytest        # all of tests/ (pytest is a dev dependency)
 
 # Frontend E2E suite (Playwright) — see frontend/e2e/README.md
 cd frontend

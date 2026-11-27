@@ -107,3 +107,27 @@ def admin_delete_outcome(status: int, body: dict) -> None:
     if status in (401, 403):
         raise HTTPException(status_code=503, detail="Account deletion is misconfigured on the server (check SUPABASE_SECRET_KEY)")
     raise HTTPException(status_code=502, detail="Could not delete your login at the auth provider")
+
+
+def recover_outcome(status: int, body: dict) -> None:
+    """POST /auth/v1/recover (password-reset email). Same neutral answer whether or not the
+    email has an account; only rate limits and provider outages are surfaced."""
+    if status == 429 or "rate_limit" in _error_code(body):
+        raise HTTPException(status_code=429, detail="Please wait a minute before requesting another email")
+    if status >= 500:
+        raise HTTPException(status_code=502, detail="Could not send the email right now")
+
+
+def reset_password_outcome(status: int, body: dict) -> None:
+    """PUT /auth/v1/user with the recovery link's access token. An expired or already-used
+    link is a 400 with a stable detail so the page can offer "request a new link"."""
+    if status == 200:
+        return
+    code = _error_code(body)
+    if code == "same_password":
+        raise HTTPException(status_code=422, detail="New password must be different from your current password")
+    if code == "weak_password":
+        raise HTTPException(status_code=422, detail=body.get("msg") or "Password is too weak")
+    if status in (401, 403) or code in ("bad_jwt", "session_not_found", "otp_expired"):
+        raise HTTPException(status_code=400, detail="link_expired")
+    raise HTTPException(status_code=502, detail="Could not update your password at the auth provider")

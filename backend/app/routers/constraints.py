@@ -15,6 +15,7 @@ from ..schemas.constraint import (
     ConstraintListOut, ValidationOut, ConflictGroupOut,
 )
 from ..services.validator import detect_conflicts, short_display_names
+from ..services.csv_import import normalize_name
 
 router = APIRouter(tags=["constraints"])
 
@@ -46,12 +47,23 @@ async def list_constraints(
     cohort: Cohort = Depends(get_cohort_or_403),
     db: AsyncSession = Depends(get_db),
 ):
-    binary = (await db.execute(
-        select(BinaryConstraint).where(BinaryConstraint.cohort_id == cohort.id)
-    )).scalars().all()
-    unary = (await db.execute(
-        select(UnaryConstraint).where(UnaryConstraint.cohort_id == cohort.id)
-    )).scalars().all()
+    # Alphabetical by student A, then student B, as the UI shows them (first + last name),
+    # ignoring case and accents; id breaks ties so the order is stable. Sorted in Python because
+    # the DB collation may be "C" (then "Álvaro" and "ana" would sort after "Zoe").
+    # Without an explicit order, Postgres returned rows in physical order, and an UPDATE writes a
+    # new row version at the end, so edited rules jumped to the bottom on reload.
+    students = (await db.execute(
+        select(Student.id, Student.first_name, Student.last_name).where(Student.cohort_id == cohort.id)
+    )).all()
+    key = {sid: normalize_name(f"{first} {last}") for sid, first, last in students}
+    binary = sorted(
+        (await db.execute(select(BinaryConstraint).where(BinaryConstraint.cohort_id == cohort.id))).scalars().all(),
+        key=lambda c: (key.get(c.student_a_id, ""), key.get(c.student_b_id, ""), c.id),
+    )
+    unary = sorted(
+        (await db.execute(select(UnaryConstraint).where(UnaryConstraint.cohort_id == cohort.id))).scalars().all(),
+        key=lambda c: (key.get(c.student_id, ""), c.type, c.id),
+    )
     return ConstraintListOut(
         binary=[BinaryConstraintOut.model_validate(c) for c in binary],
         unary=[UnaryConstraintOut.model_validate(c) for c in unary],
@@ -225,6 +237,7 @@ async def validate_constraints(
             ConflictGroupOut(
                 id=g.id, type=g.type, severity=g.severity,
                 constraint_ids=g.constraint_ids, student_ids=g.student_ids, explanation=g.explanation,
+                params=g.params,
             )
             for g in groups
         ],
