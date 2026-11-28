@@ -143,6 +143,8 @@ export interface PreviewRow {
   last_name: string;
   tags: string[];
   gender?: Gender;
+  /** `gender` was guessed from the first name (the file didn't say); the teacher should check it. */
+  gender_guessed?: boolean;
   status: ImportStatus;
   /** Server default for the include checkbox (duplicate_exact starts unticked). */
   importable: boolean;

@@ -178,6 +178,7 @@ class ImportPreviewRow(BaseModel):
     last_name:      str
     tags:           list[str]
     gender:         Optional[Gender] = None
+    gender_guessed: bool = False                   # gender came from the first name, not the file
     status:         ImportStatus
     status_message: Optional[str] = None           # English; the UI uses status_code + status_params
     status_code:    Optional[str] = None

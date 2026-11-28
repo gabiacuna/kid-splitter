@@ -37,6 +37,19 @@ test('CSV import: preview, name splitting, tags, multi-select decisions, duplica
   await expect(modal.locator('.column-notes')).toContainText('N°');
   await expect(row(0)).toContainText('curso-2a');
 
+  // No gender column: every gender is guessed from the first name, marked "?", and fixable.
+  const guessed = modal.locator('.warn-banner', { hasText: 'guessed from first names' });
+  await expect(guessed).toContainText('14 genders were guessed');
+  await expect(row(0).locator('button.gender-cycle')).toHaveText('Girl?');
+  const tomasGender = row(1).locator('button.gender-cycle');
+  await expect(tomasGender).toHaveText('Boy?');
+  await tomasGender.click();                       // Boy -> Girl: confirmed, no longer a guess
+  await expect(tomasGender).toHaveText('Girl');
+  await expect(guessed).toContainText('13 genders were guessed');
+  await tomasGender.click();
+  await tomasGender.click();                       // Girl -> unknown -> Boy
+  await expect(tomasGender).toHaveText('Boy');
+
   const panel = modal.locator('.decision-panel');
   await expect(panel.locator('.decision-item')).toHaveCount(2);
   const confirm = modal.locator('.modal-footer .btn-primary');
@@ -71,11 +84,11 @@ test('CSV import: preview, name splitting, tags, multi-select decisions, duplica
   await expect(sofia.getByRole('checkbox', { name: /Import line/ })).not.toBeChecked();
   await expect(sofia).toContainText('Added to the student already in the cohort.');
   await expect(tomas).toContainText('Possible duplicate');
-  await expect(tomas).toContainText(/tags differ/);
+  await expect(tomas).toContainText(/\(tags differ\)/); // a guessed gender never counts as differing
   await expect(tomas.getByRole('checkbox', { name: /Import line/ })).toBeChecked();
   await expect(anaCopy).toContainText('Identical to line 4');
   await expect(anaCopy.getByRole('checkbox', { name: /Import line/ })).not.toBeChecked();
-  await expect(modal.locator('.warn-banner')).toContainText('exact cop');
+  await expect(modal.locator('.warn-banner', { hasText: 'exact cop' })).toBeVisible();
 
   await tomas.getByRole('checkbox', { name: /Import line/ }).uncheck();
   await expect(confirm).toHaveText('Confirm import (1 student)');
