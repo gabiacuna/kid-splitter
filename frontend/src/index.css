@@ -787,6 +787,8 @@ input[type='range'] {
   cursor: pointer;
 }
 .gender-cycle[data-gender='none'] { color: var(--text3); font-weight: 400; }
+/* Guessed from the first name (CSV preview): dashed until the teacher confirms it. */
+.gender-cycle[data-guessed='true'] { border-style: dashed; font-weight: 500; color: var(--text2); }
 .gender-cycle:hover { border-color: var(--teal); }
 .gender-cycle:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
 

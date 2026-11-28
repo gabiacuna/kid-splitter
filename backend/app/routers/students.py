@@ -158,6 +158,7 @@ async def import_preview(
             last_name=r.last_name,
             tags=r.tags,
             gender=r.gender,
+            gender_guessed=r.gender_guessed,
             status=r.status,
             status_message=r.status_message,
             status_code=r.status_code,

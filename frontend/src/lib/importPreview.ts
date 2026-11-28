@@ -68,7 +68,8 @@ export function revalidateRow(row: RowState, rows: RowState[], existing: Student
   const twin = existing.find((s) => normName(display(s)) === name);
   if (twin) {
     const fields = [
-      (twin.gender ?? null) !== (row.gender ?? null) ? 'gender' : '',
+      // A guessed gender isn't from the file, so it never makes the row differ from its twin.
+      !row.gender_guessed && (twin.gender ?? null) !== (row.gender ?? null) ? 'gender' : '',
       [...twin.tags].sort().join(',') !== [...row.tags].sort().join(',') ? 'tags' : '',
     ].filter(Boolean);
     if (fields.length === 0) {

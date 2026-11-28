@@ -10,6 +10,8 @@ __pycache__/
 # Real student data used for manual import testing — never commit
 *.csv
 !**/fixtures/**/*.csv
+# Given-name list for guessing gender on import (no student data)
+!backend/app/data/given_names.csv
 
 # Local agent skills and configuration
 .agents/

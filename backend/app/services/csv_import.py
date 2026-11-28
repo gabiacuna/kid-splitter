@@ -7,6 +7,8 @@ from difflib import SequenceMatcher
 from dataclasses import dataclass, field
 from typing import Optional
 
+from .gender_guess import guess_gender
+
 CSV_INJECTION_CHARS = ("=", "+", "-", "@")
 MAX_ROWS = 500
 TAG_SEPARATOR = ","
@@ -75,6 +77,9 @@ class PreviewRow:
     # duplicate_exact of a student already in the cohort: that student's id. Its
     # preferences are added to that student instead of creating a copy.
     existing_student_id: Optional[str] = None
+    # The gender cell was empty (or there is no gender column): `gender` comes from
+    # guess_gender(first_name), and the preview asks the teacher to check it.
+    gender_guessed: bool = False
 
     @property
     def importable(self) -> bool:
@@ -555,12 +560,22 @@ async def parse_csv_preview(
             rows.append(bad("invalid_tag", tag_err, "invalid_tag", **tag_params))
             continue
 
-        base = dict(row_index=i, first_name=first, last_name=last, tags=tags, gender=gender, preferences=preferences)
+        # Empty cell -> guess from the given name. An unrecognised value stays unknown
+        # (invalid_gender): the file did say something, just not something we can read.
+        gender_guessed = False
+        if gender is None and not gender_err:
+            gender = guess_gender(first)
+            gender_guessed = gender is not None
+
+        base = dict(row_index=i, first_name=first, last_name=last, tags=tags, gender=gender,
+                    preferences=preferences, gender_guessed=gender_guessed)
         name = _norm_full(first, last)
         twin = existing_by_name.get(name)
         earlier = seen_rows.get(name)
         if twin is not None:
-            diff = [f for f, same in (("gender", twin.gender == gender), ("tags", set(twin.tags or []) == set(tags))) if not same]
+            # A guess isn't something the file said, so it never makes a row differ from its twin.
+            same_gender = gender_guessed or twin.gender == gender
+            diff = [f for f, same in (("gender", same_gender), ("tags", set(twin.tags or []) == set(tags))) if not same]
             if not diff:
                 rows.append(PreviewRow(**base, status="duplicate_exact", status_code="duplicate_exact",
                                        status_message="Same name, gender and tags as a student already in this cohort",

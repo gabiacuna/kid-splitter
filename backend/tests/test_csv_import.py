@@ -154,3 +154,26 @@ def test_plan_resolves_keys_dedupes_and_reports():
 def test_plan_counts_rules_added_to_existing_students():
     plan = plan_preference_pairs([PreferenceOwner("s-old", "Old Kid", ["row:0"], existing=True)], {"row:0": "n1"}, {"s-old"}, set())
     assert plan.pairs == [("s-old", "n1")] and plan.per_existing == {"s-old": 1}
+
+
+# --- gender guessed from the first name ----------------------------------------------
+
+def test_gender_guessed_when_no_gender_column():
+    p = preview("Nombre\nSoto Rojas Emma\nPaz Muñoz Agustín\nVera Lagos Kalani\n")
+    assert [(r.gender, r.gender_guessed) for r in p.rows] == [("girl", True), ("boy", True), (None, False)]
+
+
+def test_gender_from_file_wins_and_blank_cells_are_guessed():
+    p = preview("first_name,last_name,gender\nEmma,Soto,boy\nEmma,Paz,\nEmma,Rojas,xyz\n")
+    given, blank, unclear = p.rows
+    assert (given.gender, given.gender_guessed) == ("boy", False)
+    assert (blank.gender, blank.gender_guessed) == ("girl", True)
+    # An unrecognised value is not overwritten by a guess: the teacher sees "Gender unclear".
+    assert (unclear.gender, unclear.gender_guessed, unclear.status) == (None, False, "invalid_gender")
+
+
+def test_guessed_gender_does_not_make_an_existing_twin_differ():
+    existing = [ExistingStudent("s-ana", "Ana", "Soto", None, [])]
+    (ana,) = preview("first_name,last_name\nAna,Soto\n", existing).rows
+    assert ana.status == "duplicate_exact" and ana.existing_student_id == "s-ana"
+

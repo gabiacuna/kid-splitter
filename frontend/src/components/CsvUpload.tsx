@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../lib/api';
 import type { ColumnNote, ImportConfirmResponse, ImportPreviewResponse, NameSplit, PreferenceMatch, Student } from '../lib/types';
 import { useToast } from './Toast';
-import { genderLabel } from '../lib/gender';
+import { genderLabel, nextGender } from '../lib/gender';
 import { useT, getLang, translate } from '../i18n';
 import Modal from './Modal';
 import HelpTip from './HelpTip';
@@ -339,6 +339,7 @@ function PreviewModal({
   const hasPreferences = rows.some((r) => r.prefs.length > 0);
   const hasGender = rows.some((r) => r.gender || r.genderUnclear);
   const unclearGenderCount = rows.filter((r) => r.include && r.genderUnclear).length;
+  const guessedGenderCount = rows.filter((r) => r.include && r.gender_guessed).length;
   const skippedErrors = rows.filter((r) => r.status === 'missing_name' || r.status === 'invalid_tag').length;
   const exactCount = rows.filter((r) => r.status === 'duplicate_exact').length;
   const similarCount = rows.filter((r) => r.status === 'duplicate_similar').length;
@@ -388,6 +389,14 @@ function PreviewModal({
       next[index] = revalidateRow(next[index], next, existing);
       return next;
     });
+  }
+
+  /** Click-to-cycle, like the student table. Any click confirms the value, so it's no longer a guess. */
+  function cycleGender(index: number) {
+    setEdited(true);
+    setRows((prev) => prev.map((r, i) => (i === index
+      ? { ...r, gender: nextGender(r.gender), gender_guessed: false, genderUnclear: false }
+      : r)));
   }
 
   function setInclude(index: number, include: boolean) {
@@ -491,6 +500,14 @@ function PreviewModal({
             : t('They will be imported with gender unknown — set it in the student table afterwards.')}
         </div>
       )}
+      {guessedGenderCount > 0 && (
+        <div className="warn-banner" style={{ marginBottom: 12 }}>
+          {guessedGenderCount === 1
+            ? t('{n} gender was guessed from the first name (marked “?”).', { n: guessedGenderCount })
+            : t('{n} genders were guessed from first names (marked “?”).', { n: guessedGenderCount })}
+          {' '}{t('Check them and click any that are wrong to change them.')}
+        </div>
+      )}
       {preview.name_split && (
         <NameSplitNote
           split={preview.name_split}
@@ -550,8 +567,25 @@ function PreviewModal({
                     />
                   </td>
                   {hasGender && (
-                    <td style={{ fontSize: 12.5, color: row.gender ? undefined : 'var(--text3)' }}>
-                      {genderLabel(row.gender)}
+                    <td>
+                      <button
+                        type="button"
+                        className="gender-cycle"
+                        data-gender={row.gender ?? 'none'}
+                        data-guessed={row.gender_guessed ? 'true' : undefined}
+                        onClick={() => cycleGender(i)}
+                        title={row.gender_guessed
+                          ? t('Guessed from the first name. Click to change (Boy → Girl → unknown)')
+                          : t('Click to change (Boy → Girl → unknown)')}
+                        aria-label={(() => {
+                          const params = { name: display(row) || t('(no name)'), label: genderLabel(row.gender, t('unknown')) };
+                          return row.gender_guessed
+                            ? t('Gender for {name}: {label}, guessed from the first name. Activate to change.', params)
+                            : t('Gender for {name}: {label}. Activate to change.', params);
+                        })()}
+                      >
+                        {genderLabel(row.gender)}{row.gender_guessed && <span aria-hidden="true">?</span>}
+                      </button>
                     </td>
                   )}
                   <td style={{ fontSize: 12.5, whiteSpace: 'nowrap' }}>{row.tags.join(', ')}</td>
